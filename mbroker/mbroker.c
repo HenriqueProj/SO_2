@@ -14,10 +14,12 @@
 
 #include <operations.h>
 #include <state.h>
-#include <pipes.h>
+#include <utils.h>
 
-bool register_publisher(char* client_named_pipe_path, char* box_name){
-    char buffer[1];
+
+bool register_publisher(char* client_named_pipe_path, box_t box){
+
+    char* box_name = box.box_name;
 
     inode_t *root_dir_inode = inode_get(ROOT_DIR_INUM);
 
@@ -27,20 +29,43 @@ bool register_publisher(char* client_named_pipe_path, char* box_name){
     if( box_handle == -1)
         return false;
     
-    // Box não vazia - há um publisher na box já (ou a box não se apagou depois de dar kill no publisher)
-    // FIXME: Solução probably errada
-    if(tfs_read(box_handle, buffer, 1) != 0)
+    // Há um publisher na box
+    if(box.publisher != NULL)
         return false;
     
+    // Nao consegue criar o pipe do publisher 
     if(!create_pipe(client_named_pipe_path) )
         return false;
 
     // Success!!
+    box.publisher = client_named_pipe_path;
+    box.n_publishers++;
+
     return true;
 }
-/*
-bool register_sub(char* client_named_pipe_path, char* box_name){
+
+bool register_subscriber(char* client_named_pipe_path, box_t box){
+    char* box_name = box.box_name;
+
+    inode_t *root_dir_inode = inode_get(ROOT_DIR_INUM);
+
+    int box_handle = find_in_dir(root_dir_inode, box_name);
+    
+    // Box não existe
+    if( box_handle == -1)
+        return false;
+    
+    // Nao consegue criar o pipe do publisher 
+    if(!create_pipe(client_named_pipe_path) )
+        return false;
+
+    // Success!!
+    box.n_subscribers++;
+
+    return true;
 }
+
+/*
 bool create_box(char* client_named_pipe_path, char* box_name){
 }
 bool remove_box(char* client_named_pipe_path, char* box_name){

@@ -33,6 +33,29 @@ int open_pipe(char* pipename, char mode){
         tx = open(pipename, O_RDONLY);
     if (tx == -1) {
         fprintf(stderr, "[ERR]: open failed: %s\n", strerror(errno));
+        return 0;
     }
     return tx;
+}
+/*
+void write_pipe(int tx, char const *str) {
+    size_t len = strlen(str);
+    size_t written = 0;
+
+    while (written < len) {
+        ssize_t ret = write(tx, str + written, len - written);
+        if (ret < 0) {
+            fprintf(stderr, "[ERR]: write failed: %s\n", strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+
+        written += ret;
+    }
+}
+*/
+void fill_string(int size, char* array){
+    size_t len = strlen(array);
+    
+    for(size_t i = len; i < size; i++)
+        array[i] = '\0';
 }
