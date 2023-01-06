@@ -1,11 +1,41 @@
 #include "logging.h"
+#include <assert.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <pthread.h>
+
+#include <operations.h>
+#include <state.h>
+
+bool create_pipe(char* pipename){
+    // Remove pipe if it does not exist
+    if (unlink(pipename) != 0 && errno != ENOENT) {
+        printf("Register pipe: Destroy failed");
+        return false;
+    }
+    // Create pipe
+    if (mkfifo(pipename, 0640) != 0) {
+        printf("Register pipe: mkfifo failed");
+        return false;
+    }
+   
+    return true;
+}
 
 bool register_publisher(char* client_named_pipe_path, char* box_name){
-    char[1] buffer;
+    char buffer[1];
 
     inode_t *root_dir_inode = inode_get(ROOT_DIR_INUM);
 
-    int box_handle = tfs_lookup(name, root_dir_inode);
+    int box_handle = find_in_dir(root_dir_inode, box_name);
     
     // Box não existe
     if( box_handle == -1)
@@ -29,7 +59,7 @@ bool register_publisher(char* client_named_pipe_path, char* box_name){
     // Success!!
     return true;
 }
-
+/*
 bool register_sub(char* client_named_pipe_path, char* box_name){
 }
 bool create_box(char* client_named_pipe_path, char* box_name){
@@ -38,14 +68,19 @@ bool remove_box(char* client_named_pipe_path, char* box_name){
 }
 bool list_boxes(char* client_named_pipe_path){
 }
-
+*/
 int main(int argc, char **argv) {
     (void)argc;
     
-    char* pipename = argv[0];
-    int max_sessions = (int) argv[1];
+    char* register_pipe = argv[0];
+    //int max_sessions = (int) argv[1];
+    //pthread_t tid[max_sessions];
+
+    // Cria register_pipe
+    if(!create_pipe(register_pipe))
+        return -1;
+
 
     fprintf(stderr, "usage: mbroker <pipename>\n");
-    WARN("unimplemented"); // TODO: implement
-    return -1;
+    return 0;
 }
