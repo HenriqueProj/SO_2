@@ -10,6 +10,14 @@ static void print_usage() {
 int main(int argc, char **argv) {
     (void)argc;
     (void)argv;
+    /*
+    char* register_pipe = argv[0];    
+    char* type = argv[1];
+    char* box_name;
+    
+    if(argc > 2)
+        box_name = argv[2];
+    */
     print_usage();
     WARN("unimplemented"); // TODO: implement
     return -1;
