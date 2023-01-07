@@ -11,7 +11,7 @@ int main(int argc, char **argv) {
     char* box_name;
     
     fill_string(PIPE_NAME_SIZE, pipe_name);
-
+    
     if(argc > 3){
         box_name = argv[3];
         fill_string(PIPE_NAME_SIZE, box_name);
@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
 
         // Envia pedido
     }
-
+    
     int tx = open_pipe(pipe_name, 'r');
     if(tx == -1)
         return -1;
@@ -47,12 +47,12 @@ int main(int argc, char **argv) {
     int32_t return_code;
     char* error_message;
 
-    read(tx, &code, sizeof(uint8_t));
+    read_pipe(tx, &code, sizeof(uint8_t));
 
     // Criação ou remoção
     if(code == 4 || code == 6){
-        read(tx, &return_code, sizeof(int32_t) );
-        read(tx, &error_message, MESSAGE_SIZE*sizeof(char) );
+        read_pipe(tx, &return_code, sizeof(int32_t) );
+        read_pipe(tx, &error_message, MESSAGE_SIZE*sizeof(char) );
 
         if(return_code == 1){
             fprintf(stdout, "ERROR %s\n", error_message);
@@ -68,8 +68,8 @@ int main(int argc, char **argv) {
         uint8_t last;
         char* box_name;
         
-        read(tx, &code, sizeof(uint8_t));
-        read(tx, &box_name, BOX_NAME_SIZE*sizeof(char) );
+        read_pipe(tx, &code, sizeof(uint8_t));
+        read_pipe(tx, &box_name, BOX_NAME_SIZE*sizeof(char) );
         
         if(last == 1 && box_name[0] == '\0'){
             fprintf(stdout, "NO BOXES FOUND\n");
@@ -80,18 +80,18 @@ int main(int argc, char **argv) {
         uint64_t n_publishers;
         uint64_t n_subscribers;
         
-        read(tx, &box_size, sizeof(uint64_t));
-        read(tx, &n_publishers, sizeof(uint64_t));
-        read(tx, &n_subscribers, sizeof(uint64_t));
+        read_pipe(tx, &box_size, sizeof(uint64_t));
+        read_pipe(tx, &n_publishers, sizeof(uint64_t));
+        read_pipe(tx, &n_subscribers, sizeof(uint64_t));
 
         fprintf(stdout, "%s %zu %zu %zu\n", box_name, box_size, n_publishers, n_subscribers);
 
         while(last != -1){
-            read(tx, &code, sizeof(uint8_t));
-            read(tx, &box_name, BOX_NAME_SIZE*sizeof(char) );
-            read(tx, &box_size, sizeof(uint64_t));
-            read(tx, &n_publishers, sizeof(uint64_t));
-            read(tx, &n_subscribers, sizeof(uint64_t));
+            read_pipe(tx, &code, sizeof(uint8_t));
+            read_pipe(tx, &box_name, BOX_NAME_SIZE*sizeof(char) );
+            read_pipe(tx, &box_size, sizeof(uint64_t));
+            read_pipe(tx, &n_publishers, sizeof(uint64_t));
+            read_pipe(tx, &n_subscribers, sizeof(uint64_t));
 
             fprintf(stdout, "%s %zu %zu %zu\n", box_name, box_size, n_publishers, n_subscribers);
         }

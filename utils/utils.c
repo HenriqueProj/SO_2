@@ -58,3 +58,15 @@ void fill_string(size_t size, char* array){
     
     memset(array + len, '\0', (size - len)*sizeof(char) );
 }
+
+// Lê do pipe e verifica o return value
+ssize_t read_pipe(int rx, void* buffer, size_t size){
+
+    ssize_t ret = read(rx, buffer, size);
+    
+    if (ret == -1) {
+        fprintf(stderr, "[ERR]: read failed: %s\n", strerror(errno));
+        return -1;
+    }
+    return ret;
+}

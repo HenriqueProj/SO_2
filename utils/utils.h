@@ -49,5 +49,6 @@ int create_pipe(char* pipename);
 int open_pipe(char* pipename, char mode);
 /*void write_pipe(int tx, char const *str);*/
 void fill_string(int size, char* array);
+int read_pipe(int rx, void* buffer, int size);
 
 #endif
