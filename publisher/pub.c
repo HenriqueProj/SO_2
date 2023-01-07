@@ -2,6 +2,9 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <utils.h>
+#include <string.h>
+#include <fcntl.h> // for open
+#include <unistd.h> // for close
 
 int main(int argc, char **argv) {
     (void)argc;
@@ -21,13 +24,19 @@ int main(int argc, char **argv) {
     
     // registou !!
     char* str;
+    char* message = "";
 
-    tx = open_pipe(pub_pipename, 'w');
+    int tx = open_pipe(pub_pipename, 'w');
     if(tx == -1)
         return -1;
 
+
     while(fgets(str, MESSAGE_SIZE, stdin) != NULL){
-        message += str;
+        
+        strcpy(message, str);
+        fill_string(MESSAGE_SIZE, message);
+
+        // TODO: Envia mensagem pelo pipe ao server
     }
 
     // TODO: Envia mensagem pelo pipe ao server

@@ -53,9 +53,8 @@ void write_pipe(int tx, char const *str) {
     }
 }
 */
-void fill_string(int size, char* array){
+void fill_string(size_t size, char* array){
     size_t len = strlen(array);
     
-    for(size_t i = len; i < size; i++)
-        array[i] = '\0';
+    memset(array + len, '\0', (size - len)*sizeof(char) );
 }

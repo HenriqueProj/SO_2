@@ -23,7 +23,7 @@ bool register_publisher(char* client_named_pipe_path, box_t box){
 
     inode_t *root_dir_inode = inode_get(ROOT_DIR_INUM);
 
-    int box_handle = find_in_dir(root_dir_inode, box_name);
+    int box_handle = find_in_dir(root_dir_inode, box_name + 1);
     
     // Box não existe
     if( box_handle == -1)
@@ -49,7 +49,7 @@ bool register_subscriber(char* client_named_pipe_path, box_t box){
 
     inode_t *root_dir_inode = inode_get(ROOT_DIR_INUM);
 
-    int box_handle = find_in_dir(root_dir_inode, box_name);
+    int box_handle = find_in_dir(root_dir_inode, box_name + 1);
     
     // Box não existe
     if( box_handle == -1)
