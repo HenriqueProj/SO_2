@@ -26,7 +26,7 @@ typedef struct {
 // Registo de publishers e subscribers
 // Ou criação / remoção de caixas
 typedef struct {
-    uint8_t code;
+    //the code of the request is sent before
     char* client_name_pipe_path;
     char* box_name;
 } register_request_t;
@@ -41,7 +41,6 @@ typedef struct {
 // Envio de mensagem do publicador para servidor / servidor para subscritor
 // ou pedido de listagem de caixas
 typedef struct {
-    uint8_t code;
     char* string;
 } message_exchange_t;
 

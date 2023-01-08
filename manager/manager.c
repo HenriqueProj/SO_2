@@ -5,38 +5,53 @@
 
 int main(int argc, char **argv) {
 
-    char* register_pipe = argv[0];    
-    char* pipe_name = argv[1];
-    char* type = argv[2];
+    char* register_pipe_name = argv[1];    
+    char* pipe_name = argv[2];
+    char* type = argv[3];
     char* box_name;
     
     fill_string(PIPE_NAME_SIZE, pipe_name);
     
-    if(argc > 3){
-        box_name = argv[3];
+    if(argc > 4) {
+        box_name = argv[4];
         fill_string(PIPE_NAME_SIZE, box_name);
     }
 
-    if( !create_pipe(pipe_name) || !open_pipe(register_pipe, 'w'))
+    int register_pipe = open_pipe(register_pipe_name, 'w');
+
+    if( !create_pipe(pipe_name) || register_pipe == -1)
         return -1;
 
+    //uint8_t request_code;
     // Pedido de criação de caixa
     if(!strcmp(type, "create") ){
-        register_request_t request = {3, pipe_name, box_name};
-
+        /*request_code = 3;
+        register_request_t request = {pipe_name, box_name};
+        if(write(register_pipe, &request_code, sizeof(uint8_t)) < 1)
+            exit(EXIT_FAILURE);
+        if(write(register_pipe, &request, sizeof(register_request_t)) < 1)
+            exit(EXIT_FAILURE);
+        */
         // Envia pedido
     }
     // Pedido de remoção de caixa
     else if(!strcmp(type, "remove") ){
-        register_request_t request = {5, pipe_name, box_name};
-
-        // Envia pedido
+        /*request_code = 5;
+        register_request_t request = {pipe_name, box_name};
+        if(write(register_pipe, &request_code, sizeof(uint8_t)) < 1)
+            exit(EXIT_FAILURE);
+        if(write(register_pipe, &request, sizeof(register_request_t)) < 1)
+            exit(EXIT_FAILURE);
+        */
     }
     // Pedido de listagem de caixas
     else{
-        message_exchange_t request = {7, pipe_name};
-
-        // Envia pedido
+        /*request_code = 7;
+        if(write(register_pipe, &request_code, sizeof(uint8_t)) < 1)
+            exit(EXIT_FAILURE);
+        if(write(register_pipe, pipe_name, strlen(pipe_name)) < 1)
+            exit(EXIT_FAILURE);
+        */
     }
     
     int tx = open_pipe(pipe_name, 'r');

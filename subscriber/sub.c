@@ -1,25 +1,36 @@
 #include "logging.h"
 #include <utils.h>
+#include <string.h>
+#include <errno.h>
+#include <signal.h>
 
-static void sig_handler(int sig, char* sub_name, int messages) {
+int n_messages;
+char* sub_name;
 
+static void handle() {
+
+    fprintf(stdout, "Subscriber %s recebeu %d mensagens\n", sub_name, n_messages);
+    return;
+}
+
+static void sig_handler(int sig) {
     if (sig != SIGINT) 
         return;
 
     if (signal(SIGINT, sig_handler) == SIG_ERR) {
         return;
     }
-    // FIXME : fprintf not safe em signal handlers
-    //       : formato de mensagem não especificado no enunciado?????
-    fprintf(stderr, "Subscriber %s recebeu %d mensagens\n", sub_name, messages);
+    handle();
     return;
 }
 
 int main(int argc, char **argv) {
     (void)argc;
-    char* register_pipe = argv[0];
-    char* sub_pipename = argv[1];
-    char* box_name = argv[2];
+    char* register_pipe = argv[1];
+    char* sub_pipename = argv[2];
+    char* box_name = argv[3];
+    
+    sub_name = argv[2];
 
     fill_string(PIPE_NAME_SIZE, sub_pipename);
     fill_string(BOX_NAME_SIZE, box_name);
@@ -38,6 +49,7 @@ int main(int argc, char **argv) {
     char message[MESSAGE_SIZE];
 
     ssize_t bytes_read = read_pipe(tx, &message, MESSAGE_SIZE);
+    n_messages++;
 
     // Só sai em caso de erro do read ou SIGINT
     // FIXME : Espera ativa?
@@ -47,7 +59,8 @@ int main(int argc, char **argv) {
         if(bytes_read > 0){
             // Imprime a mensagem e reseta o buffer
             fprintf(stdout, "%s\n", message);
-            memset(message, "", MESSAGE_SIZE);
+            memset(message, 0, MESSAGE_SIZE);
+            n_messages++;
         } 
 
         // Checka o SIGINT

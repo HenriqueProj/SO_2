@@ -9,9 +9,9 @@
 int main(int argc, char **argv) {
     (void)argc;
     
-    char* register_pipe = argv[0];
-    char* pub_pipename = argv[1];
-    char* box_name = argv[2];
+    char* register_pipe = argv[1];
+    char* pub_pipename = argv[2];
+    char* box_name = argv[3];
 
     fill_string(PIPE_NAME_SIZE, pub_pipename);
     fill_string(BOX_NAME_SIZE, box_name);
