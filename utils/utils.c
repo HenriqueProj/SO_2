@@ -56,7 +56,7 @@ void write_pipe(int tx, char const *str) {
 void fill_string(size_t size, char* array){
     size_t len = strlen(array);
     
-    memset(array + len, 0, size - len  );
+    memset(array + len, '\0', size - len  );
 }
 
 // Lê do pipe e verifica o return value

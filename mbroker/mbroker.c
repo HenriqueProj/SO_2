@@ -163,12 +163,11 @@ void create_box(int register_pipe) {
     if(box_handle == -1){
         reply_to_box_creation(box_request.client_name_pipe_path, 0);
     }
-
+    box.box_size = 0;
     box.n_publishers = 0;
     box.n_subscribers = 0;
     strcpy(box.box_name, box_request.box_name);
     
-
     tfs_close(box_handle);
     reply_to_box_creation(box_request.client_name_pipe_path, 1);
 
@@ -204,29 +203,75 @@ void reply_to_box_removal(char* pipe_name, int n) {
 void remove_box(int register_pipe) {
     box_t box;
     register_request_t box_request;
-    printf("1\n");
+    
     ssize_t bytes_read = read_pipe(register_pipe, &box_request, sizeof(register_request_t));
 
     if(bytes_read == -1)
         reply_to_box_removal(box_request.client_name_pipe_path, 0);
-    printf("1\n");
+  
     //verificar se está no array global??
 
     //the box doesn't exist
     if(find_in_dir(inode_get(ROOT_DIR_INUM), box_request.box_name) == -1)
         reply_to_box_removal(box_request.client_name_pipe_path, 0);
-    printf("2\n");
+
     //unlink file associated to box
     int box_handle = tfs_unlink(box_request.box_name);
 
     if(box_handle == -1) 
         reply_to_box_removal(box_request.client_name_pipe_path, 0);
-    printf("3\n");
+ 
     //free box from array
     delete_box(box);
-    printf("4\n");
+
     reply_to_box_removal(box_request.client_name_pipe_path, 1);
 
+}
+
+void reply_to_list_boxes(char* manager_pipe){
+    uint8_t code = 8;
+    box_t reply_box;
+
+    int man_pipe = open_pipe(manager_pipe, 'w');
+
+    int i = 0;
+
+    if(write(man_pipe, &code, sizeof(uint8_t)) < 1){
+        exit(EXIT_FAILURE);
+    }
+    if(n_boxes == 0){
+        reply_box.last = 1;
+        //fill_string(PIPE_NAME_SIZE, reply_box.publisher);
+        //fill_string(PIPE_NAME_SIZE, reply_box.box_name);
+        strcpy(reply_box.publisher, "\0");
+        strcpy(reply_box.box_name, "\0");
+
+        reply_box.box_size = 0;
+        reply_box.n_publishers = 0;
+        reply_box.n_subscribers = 0;
+
+        if(write(man_pipe, &reply_box, sizeof(box_t)) < 1)
+            exit(EXIT_FAILURE);
+    }
+    else{
+        boxes[n_boxes - 1].last = 1;
+
+        for(i = 0; i < n_boxes; i++){
+            reply_box = boxes[i];
+        
+        fprintf(stdout, "%s %zu %zu %zu\n", reply_box.box_name, reply_box.box_size, reply_box.n_publishers, reply_box.n_subscribers);
+
+        if(write(man_pipe, &reply_box, sizeof(box_t)) < 1)
+            exit(EXIT_FAILURE);
+        }
+    }
+}
+
+void list_boxes(int register_pipe){
+    char manager_pipe[PIPE_NAME_SIZE];
+    read_pipe(register_pipe, &manager_pipe, PIPE_NAME_SIZE);
+    
+    reply_to_list_boxes(manager_pipe);
 }
 
 int main(int argc, char **argv) {
@@ -248,8 +293,10 @@ int main(int argc, char **argv) {
     uint8_t code;
 
     ssize_t bytes_read; //= read_pipe(register_pipe, &code, sizeof(uint8_t));
-
+   
     while((bytes_read = read_pipe(register_pipe, &code, sizeof(uint8_t))) != -1) {
+        //if(bytes_read > 0){
+        //}
         switch(code) {
         case 1:
                 //register publisher
@@ -259,25 +306,20 @@ int main(int argc, char **argv) {
                 break;
         case 3:
                 //create box
+                printf("Entrou!\n");
                 create_box(register_pipe);
-                break;
-        case 4:
-                //reply to box creation
-                // is this case neeeded??
+                code = 0;
                 break;
         case 5:
                 //box removal
+                printf("Entrou!\n");
                 remove_box(register_pipe);
-                break;
-        case 6:
-                //reply to box removal
-                // is this case needed?
+                code = 0;
                 break;
         case 7:
-                //list boxes
-                break;
-        case 8:
-                //reply to list the boxes
+                printf("List    \n");
+                list_boxes(register_pipe);
+                code = 0;
                 break;
         case 9:
                 //messages sent from publisher to server
@@ -286,9 +328,9 @@ int main(int argc, char **argv) {
                 //messages sent from server to subscriber
                 break;
         default:
-                //should generate error?
                 break;
         }
+
     }        
 
     fprintf(stderr, "usage: mbroker <pipename>\n");

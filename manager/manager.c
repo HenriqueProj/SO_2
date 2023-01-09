@@ -10,8 +10,8 @@ int main(int argc, char **argv) {
     char* type = argv[3];
     char* box_name;
     
-    //fill_string(PIPE_NAME_SIZE, pipe_name);
-    
+    // Funciona
+
     if(argc > 4) {
         box_name = argv[4];
        //fill_string(BOX_NAME_SIZE, box_name);
@@ -27,10 +27,12 @@ int main(int argc, char **argv) {
     // Pedido de criação de caixa
     if(!strcmp(type, "create") ){
         request_code = 3;
-
+        
         register_request_t request;
         strcpy(request.client_name_pipe_path, pipe_name);
         strcpy(request.box_name, box_name);
+
+        printf("Pedido\n");
 
         if(write(register_pipe, &request_code, sizeof(uint8_t)) < 1)
             exit(EXIT_FAILURE);
@@ -41,10 +43,9 @@ int main(int argc, char **argv) {
     // Pedido de remoção de caixa
     else if(!strcmp(type, "remove") ){
         request_code = 5;
-
+        printf("Pedido\n");
         register_request_t request;
         strcpy(request.client_name_pipe_path, pipe_name);
-        printf("%s\n", box_name);
         strcpy(request.box_name, box_name);
 
         printf("Remove1");
@@ -56,13 +57,22 @@ int main(int argc, char **argv) {
         printf("Remove3");
     }
     // Pedido de listagem de caixas
-    else{
-        /*request_code = 7;
+    else if(!strcmp(type, "list") ){
+        printf("Pedido\n");
+        request_code = 7;
+
+        // Evita um string overread no read
+        // Por causa do \0, assume que o tamanho máximo do ponteiro é o strlen do ponteiro
+        char named_pipe[PIPE_NAME_SIZE];
+        strcpy(named_pipe, pipe_name);
+
+        //fill_string(PIPE_NAME_SIZE, named_pipe);
+
         if(write(register_pipe, &request_code, sizeof(uint8_t)) < 1)
             exit(EXIT_FAILURE);
-        if(write(register_pipe, pipe_name, strlen(pipe_name)) < 1)
+        if(write(register_pipe, &named_pipe, PIPE_NAME_SIZE) < 1)
             exit(EXIT_FAILURE);
-        */
+        
     }
     
     int tx = open_pipe(pipe_name, 'r');
@@ -93,38 +103,28 @@ int main(int argc, char **argv) {
     }
     // Listagem
     else if(code == 8){
-        /*
-        uint8_t last;
-        char* box_name;
         
-        read_pipe(tx, &code, sizeof(uint8_t));
-        read_pipe(tx, &box_name, BOX_NAME_SIZE*sizeof(char) );
+        box_t box;
+
+        //read_pipe(tx, &code, sizeof(uint8_t));
+        read_pipe(tx, &box, sizeof(box_t));
         
-        if(last == 1 && box_name[0] == '\0'){
+        if(box.last == 1 && box.box_name[0] == '\0'){
             fprintf(stdout, "NO BOXES FOUND\n");
             return -1;
         }
+        printf("LISTING:\n");
+        fprintf(stdout, "%s %zu %zu %zu\n", box.box_name, box.box_size, box.n_publishers, box.n_subscribers);
 
-        uint64_t box_size;
-        uint64_t n_publishers;
-        uint64_t n_subscribers;
-        
-        read_pipe(tx, &box_size, sizeof(uint64_t));
-        read_pipe(tx, &n_publishers, sizeof(uint64_t));
-        read_pipe(tx, &n_subscribers, sizeof(uint64_t));
-
-        fprintf(stdout, "%s %zu %zu %zu\n", box_name, box_size, n_publishers, n_subscribers);
-
-        while(last != -1){
+        while(box.last != 1){
             read_pipe(tx, &code, sizeof(uint8_t));
-            read_pipe(tx, &box_name, BOX_NAME_SIZE*sizeof(char) );
-            read_pipe(tx, &box_size, sizeof(uint64_t));
-            read_pipe(tx, &n_publishers, sizeof(uint64_t));
-            read_pipe(tx, &n_subscribers, sizeof(uint64_t));
 
-            fprintf(stdout, "%s %zu %zu %zu\n", box_name, box_size, n_publishers, n_subscribers);
+            read_pipe(tx, &box, sizeof(box_t));
+
+            fprintf(stdout, "%s %zu %zu %zu\n", box.box_name, box.box_size, box.n_publishers, box.n_subscribers);
         }
-        */
+        close(tx);
+        
     }   
     else    
         return -1;

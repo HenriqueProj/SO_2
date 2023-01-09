@@ -13,7 +13,6 @@ typedef struct {
     char box_name[BOX_NAME_SIZE];
     char publisher[PIPE_NAME_SIZE];
 
-
     uint64_t box_size;
     uint64_t n_publishers;
     uint64_t n_subscribers;
