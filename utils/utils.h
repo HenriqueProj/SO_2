@@ -9,7 +9,7 @@
 #define BOX_NAME_SIZE 32
 #define MESSAGE_SIZE 1024
 
-typedef struct {
+typedef struct __attribute__((__packed__)){
     char box_name[BOX_NAME_SIZE];
     char publisher[PIPE_NAME_SIZE];
 
@@ -24,21 +24,21 @@ typedef struct {
 
 // Registo de publishers e subscribers
 // Ou criação / remoção de caixas
-typedef struct {
+typedef struct __attribute__((__packed__)){
     //the code of the request is sent before
     char client_name_pipe_path[PIPE_NAME_SIZE];
     char box_name[BOX_NAME_SIZE];
 } register_request_t;
 
 // Resposta ao pedido de criação/remoção de caixa
-typedef struct {
+typedef struct __attribute__((__packed__)){
     int32_t return_code;
     char error_message[MESSAGE_SIZE];
 } box_reply_t;
 
 // Envio de mensagem do publicador para servidor / servidor para subscritor
 // ou pedido de listagem de caixas
-typedef struct {
+typedef struct __attribute__((__packed__)){
     char string[MESSAGE_SIZE];
 } message_exchange_t;
 
