@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
 
     if(argc > 4) {
         box_name = argv[4];
-       //fill_string(BOX_NAME_SIZE, box_name);
+       fill_string(BOX_NAME_SIZE, box_name);
     }
 
     int register_pipe = open_pipe(register_pipe_name, 'w');
@@ -32,6 +32,9 @@ int main(int argc, char **argv) {
         strcpy(request.client_name_pipe_path, pipe_name);
         strcpy(request.box_name, box_name);
 
+        fill_string(PIPE_NAME_SIZE, request.client_name_pipe_path);
+        fill_string(BOX_NAME_SIZE, request.box_name);
+
         if(write(register_pipe, &request_code, sizeof(uint8_t)) < 1)
             exit(EXIT_FAILURE);
         if(write(register_pipe, &request, sizeof(register_request_t)) < 1)
@@ -44,6 +47,9 @@ int main(int argc, char **argv) {
         register_request_t request;
         strcpy(request.client_name_pipe_path, pipe_name);
         strcpy(request.box_name, box_name);
+
+        fill_string(PIPE_NAME_SIZE, request.client_name_pipe_path);
+        fill_string(PIPE_NAME_SIZE, request.box_name);
 
         if(write(register_pipe, &request_code, sizeof(uint8_t)) < 1)
             exit(EXIT_FAILURE);
@@ -60,7 +66,7 @@ int main(int argc, char **argv) {
         char named_pipe[PIPE_NAME_SIZE];
         strcpy(named_pipe, pipe_name);
 
-        //fill_string(PIPE_NAME_SIZE, named_pipe);
+        fill_string(PIPE_NAME_SIZE, named_pipe);
 
         if(write(register_pipe, &request_code, sizeof(uint8_t)) < 1)
             exit(EXIT_FAILURE);
@@ -87,8 +93,8 @@ int main(int argc, char **argv) {
 
         close(tx);
 
-        if(box_reply.return_code == 1){
-            fprintf(stdout, "ERROR %s\n", box_reply.error_message);
+        if(box_reply.return_code == -1){
+            fprintf(stdout, "ERROR: %s\n", box_reply.error_message);
             return -1;
         }
 
@@ -111,8 +117,6 @@ int main(int argc, char **argv) {
         fprintf(stdout, "%s %zu %zu %zu\n", box.box_name, box.box_size, box.n_publishers, box.n_subscribers);
 
         while(box.last != 1){
-            read_pipe(tx, &code, sizeof(uint8_t));
-
             read_pipe(tx, &box, sizeof(box_t));
 
             fprintf(stdout, "%s %zu %zu %zu\n", box.box_name, box.box_size, box.n_publishers, box.n_subscribers);

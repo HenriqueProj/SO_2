@@ -31,9 +31,9 @@ int open_pipe(char* pipename, char mode){
         tx = open(pipename, O_WRONLY);
     else
         tx = open(pipename, O_RDONLY);
+        
     if (tx == -1) {
         fprintf(stderr, "[ERR]: open failed: %s\n", strerror(errno));
-        return 0;
     }
     return tx;
 }

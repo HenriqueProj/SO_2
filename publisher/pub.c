@@ -13,8 +13,8 @@ int main(int argc, char **argv) {
     char* pub_pipename = argv[2];
     char* box_name = argv[3];
 
-    fill_string(PIPE_NAME_SIZE, pub_pipename);
-    fill_string(BOX_NAME_SIZE, box_name);
+    //fill_string(PIPE_NAME_SIZE, pub_pipename);
+    //fill_string(BOX_NAME_SIZE, box_name);
 
     int register_int = open_pipe(register_pipe, 'w');
 
@@ -27,38 +27,44 @@ int main(int argc, char **argv) {
     strcpy(request.client_name_pipe_path, pub_pipename);
     strcpy(request.box_name, box_name);
 
+    fill_string(PIPE_NAME_SIZE, request.client_name_pipe_path);
+    fill_string(BOX_NAME_SIZE, request.box_name);
+
     if(write(register_int, &code, sizeof(uint8_t)) < 1)
             exit(EXIT_FAILURE);
     if(write(register_int, &request, sizeof(register_request_t)) < 1)
             exit(EXIT_FAILURE);
     printf("PEDIU O REGISTO DE PUBLISHER\n");
 
+    close(register_int);
+
     // registou !!
     char str[MESSAGE_SIZE];
-    char* message = "";
+    char message[MESSAGE_SIZE];
 
-    int tx = open_pipe(pub_pipename, 'w');
+    int tx = open_pipe(request.client_name_pipe_path, 'w');
+
     if(tx == -1)
         return -1;
 
+    printf("PIPE OPENED\n");
 
     while(fgets(str, MESSAGE_SIZE, stdin) != NULL){
-        
+        printf("A\n");
         strcpy(message, str);
+        printf("A\n");
         fill_string(MESSAGE_SIZE, message);
 
-        // TODO: Envia mensagem pelo pipe ao server
+        // Envia mensagem pelo pipe ao server
         code = 9;
 
         if(write(tx, &code, sizeof(uint8_t)) < 1)
             exit(EXIT_FAILURE);
         if(write(tx, &str, sizeof(char)*MESSAGE_SIZE) < 1)
             exit(EXIT_FAILURE);
+        printf("Nova Mensagem!\n");
     }
 
-    // TODO: Envia mensagem pelo pipe ao server
-
     close(tx);
-
     return -1;
 }

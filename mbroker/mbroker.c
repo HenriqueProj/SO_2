@@ -23,8 +23,8 @@
 box_t boxes[MAX_BOXES];
 int n_boxes;
 
-void box_swap(int i){
-    char* string_aux = "";
+void delete_box(int i){
+    char string_aux[PIPE_NAME_SIZE];
     uint64_t int_aux;
     uint8_t last_aux;
 
@@ -59,7 +59,7 @@ void add_box(box_t box){
     boxes[n_boxes] = box;
     n_boxes++;
 }
-
+/*
 void delete_box(box_t box){
     char* box_name;
     for(int i = 0; i < n_boxes; i++){
@@ -83,32 +83,56 @@ int find_box(char* box_name) {
     return -1;
 
 }
+*/
+void publisher_function(int register_pipe){
+    box_t box;
+    register_request_t request;
+    read_pipe(register_pipe, &request, sizeof(register_request_t));
 
-bool register_publisher(char* client_named_pipe_path, box_t box){
-
-    char* box_name = box.box_name;
-
-    inode_t *root_dir_inode = inode_get(ROOT_DIR_INUM);
-
-    int box_handle = find_in_dir(root_dir_inode, box_name + 1);
-    
+    int box_handle = find_in_dir(inode_get(ROOT_DIR_INUM), request.box_name + 1);
+  
     // Box não existe
-    if( box_handle == -1)
-        return false;
+    if(box_handle == -1)
+        return;
     
+    int ver = -1;
+
+    for(int i = 0; i < n_boxes; i++){
+        if( !strcmp(boxes[i].box_name, request.box_name) ){
+            box = boxes[i];
+            ver = 1;
+            break;
+        }
+    }
+
+    // Não está no array de boxes
+    if(ver == -1)
+        return;
+
     // Há um publisher na box
-    if(box.publisher != NULL)
-        return false;
-    
+    if(box.n_publishers != 0)
+        return;
+
     // Nao consegue criar o pipe do publisher 
-    if(!create_pipe(client_named_pipe_path) )
-        return false;
+    if(!create_pipe(request.client_name_pipe_path) )
+        return;
 
     // Success!!
-    strcpy(box.publisher, client_named_pipe_path);
-    box.n_publishers++;
+    box.n_publishers = 1;
 
-    return true;
+    printf("Great Success!\n");
+
+    // FIM DO REGISTO
+    uint8_t code;
+    char message[MESSAGE_SIZE];
+
+    int pub_pipe = open_pipe(request.client_name_pipe_path, 'r');
+
+    while((read_pipe(pub_pipe, &code, sizeof(uint8_t))) != -1) {
+        read_pipe(pub_pipe, &message, MESSAGE_SIZE);
+    
+        printf("%s", message);
+    }
 }
 
 void register_subscriber(int register_pipe){
@@ -151,9 +175,9 @@ void reply_to_box_creation(char* pipe_name, int n) {
     //error creating box
     if(n == 0) {
         reply.return_code = -1;
-        strcpy(reply.error_message, "ERROR: Couldn't create box");
+        strcpy(reply.error_message, "Couldn't create box");
     }
-
+    
     int manager_pipe = open_pipe(pipe_name, 'w');
 
 
@@ -173,17 +197,27 @@ void create_box(int register_pipe) {
    
     if(bytes_read == -1){
         reply_to_box_creation(box_request.client_name_pipe_path, 0);
+        return;
     }
     int file_handle = find_in_dir(inode_get(ROOT_DIR_INUM), box_request.box_name + 1);
     
     //the box already exists
     if(file_handle != -1){
         reply_to_box_creation(box_request.client_name_pipe_path, 0);
+        return;
     }
+    for(int cont = 0; cont < n_boxes; cont++){
+        if(!strcmp(boxes[cont].box_name, box_request.box_name) ){
+            reply_to_box_creation(box_request.client_name_pipe_path, 0);
+            return;
+        }
+    }
+
     int box_handle = tfs_open(box_request.box_name, TFS_O_CREAT);
 
     if(box_handle == -1){
         reply_to_box_creation(box_request.client_name_pipe_path, 0);
+        return;
     }
     box.box_size = 0;
     box.n_publishers = 0;
@@ -208,7 +242,7 @@ void reply_to_box_removal(char* pipe_name, int n) {
     //error creating box
     if(n == 0) {
         reply.return_code = -1;
-        strcpy(reply.error_message, "ERROR: Could'nt create box");
+        strcpy(reply.error_message, "Couldn't remove box");
     } 
 
    int manager_pipe = open_pipe(pipe_name, 'w');
@@ -225,28 +259,49 @@ void reply_to_box_removal(char* pipe_name, int n) {
 }
 
 void remove_box(int register_pipe) {
-    box_t box;
     register_request_t box_request;
     
     ssize_t bytes_read = read_pipe(register_pipe, &box_request, sizeof(register_request_t));
 
-    if(bytes_read == -1)
+    if(bytes_read == -1){
         reply_to_box_removal(box_request.client_name_pipe_path, 0);
-  
-    //verificar se está no array global??
-
+        return;
+    }
+    printf("1\n");
     //the box doesn't exist
-    if(find_in_dir(inode_get(ROOT_DIR_INUM), box_request.box_name) == -1)
-        reply_to_box_removal(box_request.client_name_pipe_path, 0);
-
+    //if(find_in_dir(inode_get(ROOT_DIR_INUM), box_request.box_name) == -1){
+    //    reply_to_box_removal(box_request.client_name_pipe_path, 0);
+    //    return;
+    //}
+    printf("2\n");
     //unlink file associated to box
     int box_handle = tfs_unlink(box_request.box_name);
 
-    if(box_handle == -1) 
+    if(box_handle == -1){
         reply_to_box_removal(box_request.client_name_pipe_path, 0);
- 
+        return;
+    }
+    printf("3\n");
+
+    //verifica se está no array global
+    int ver = -1;
+
+    for(int cont = 0; cont < n_boxes; cont++){
+        if(!strcmp(boxes[cont].box_name, box_request.box_name)){
+            // Índice da box no array
+            ver = cont;
+            break;
+        }
+    }
+    // Box não está no array global
+    if(ver == -1){
+        reply_to_box_removal(box_request.client_name_pipe_path, 0);
+        return;
+    }
+
     //free box from array
-    delete_box(box);
+    printf("%s %s\n", box_request.box_name, boxes[ver].box_name);
+    delete_box(ver);
 
     reply_to_box_removal(box_request.client_name_pipe_path, 1);
 
@@ -334,6 +389,7 @@ int main(int argc, char **argv) {
         switch(code) {
         case 1:
                 //register publisher
+                publisher_function(register_pipe);
                 break;
         case 2:
                 //register subscriber
