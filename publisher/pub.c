@@ -16,14 +16,25 @@ int main(int argc, char **argv) {
     fill_string(PIPE_NAME_SIZE, pub_pipename);
     fill_string(BOX_NAME_SIZE, box_name);
 
-    if( !create_pipe(pub_pipename) || !open_pipe(register_pipe, 'w'))
+    int register_int = open_pipe(register_pipe, 'w');
+
+    if( !create_pipe(pub_pipename) || !register_int)
         return -1;
 
-    // TODO: Envia o pedido de registo
-    //...
-    
+    uint8_t code = 1;
+    register_request_t request;
+
+    strcpy(request.client_name_pipe_path, pub_pipename);
+    strcpy(request.box_name, box_name);
+
+    if(write(register_int, &code, sizeof(uint8_t)) < 1)
+            exit(EXIT_FAILURE);
+    if(write(register_int, &request, sizeof(register_request_t)) < 1)
+            exit(EXIT_FAILURE);
+    printf("PEDIU O REGISTO DE PUBLISHER\n");
+
     // registou !!
-    char* str;
+    char str[MESSAGE_SIZE];
     char* message = "";
 
     int tx = open_pipe(pub_pipename, 'w');
@@ -37,6 +48,12 @@ int main(int argc, char **argv) {
         fill_string(MESSAGE_SIZE, message);
 
         // TODO: Envia mensagem pelo pipe ao server
+        code = 9;
+
+        if(write(tx, &code, sizeof(uint8_t)) < 1)
+            exit(EXIT_FAILURE);
+        if(write(tx, &str, sizeof(char)*MESSAGE_SIZE) < 1)
+            exit(EXIT_FAILURE);
     }
 
     // TODO: Envia mensagem pelo pipe ao server

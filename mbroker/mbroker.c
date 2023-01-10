@@ -193,9 +193,11 @@ void reply_to_box_removal(char* pipe_name, int n) {
 
 
     if(write(manager_pipe, &code, sizeof(uint8_t)) < 1){
+        printf("Writing error\n");
         exit(EXIT_FAILURE);
     }
     if(write(manager_pipe, &reply, sizeof(box_reply_t)) < 1){
+        printf("Writing error\n");
         exit(EXIT_FAILURE);
     }
 }
@@ -264,15 +266,25 @@ void reply_to_list_boxes(char* manager_pipe){
         if(write(man_pipe, &reply_box, sizeof(box_t)) < 1)
             exit(EXIT_FAILURE);
         }
+        // Reseta o last para no segundo list não bloquear neste elemento
+        boxes[n_boxes - 1].last = 0;
     }
 }
 
 void list_boxes(int register_pipe){
     char manager_pipe[PIPE_NAME_SIZE];
+
     read_pipe(register_pipe, &manager_pipe, PIPE_NAME_SIZE);
     
     reply_to_list_boxes(manager_pipe);
 }
+
+void publisher_messages(int register_pipe){
+    char pub_pipe[PIPE_NAME_SIZE];
+
+    read_pipe(register_pipe, &pub_pipe, PIPE_NAME_SIZE);
+}
+
 
 int main(int argc, char **argv) {
     (void)argc;
@@ -308,21 +320,19 @@ int main(int argc, char **argv) {
                 //create box
                 printf("Entrou!\n");
                 create_box(register_pipe);
-                code = 0;
                 break;
         case 5:
                 //box removal
                 printf("Entrou!\n");
                 remove_box(register_pipe);
-                code = 0;
                 break;
         case 7:
-                printf("List    \n");
+                printf("A ENVIAR:\n");
                 list_boxes(register_pipe);
-                code = 0;
                 break;
         case 9:
                 //messages sent from publisher to server
+                publisher_messages(register_pipe);
                 break;
         case 10:
                 //messages sent from server to subscriber
@@ -330,7 +340,7 @@ int main(int argc, char **argv) {
         default:
                 break;
         }
-
+        code = 0;
     }        
 
     fprintf(stderr, "usage: mbroker <pipename>\n");

@@ -32,33 +32,27 @@ int main(int argc, char **argv) {
         strcpy(request.client_name_pipe_path, pipe_name);
         strcpy(request.box_name, box_name);
 
-        printf("Pedido\n");
-
         if(write(register_pipe, &request_code, sizeof(uint8_t)) < 1)
             exit(EXIT_FAILURE);
         if(write(register_pipe, &request, sizeof(register_request_t)) < 1)
             exit(EXIT_FAILURE);
-        // Envia pedido
+        printf("PEDIU A CRIAÇÂO\n");
     }
     // Pedido de remoção de caixa
     else if(!strcmp(type, "remove") ){
         request_code = 5;
-        printf("Pedido\n");
         register_request_t request;
         strcpy(request.client_name_pipe_path, pipe_name);
         strcpy(request.box_name, box_name);
 
-        printf("Remove1");
         if(write(register_pipe, &request_code, sizeof(uint8_t)) < 1)
             exit(EXIT_FAILURE);
-        printf("Remove2");
         if(write(register_pipe, &request, sizeof(register_request_t)) < 1)
             exit(EXIT_FAILURE);
-        printf("Remove3");
+        printf("PEDIU A REMOÇÂO\n");
     }
     // Pedido de listagem de caixas
     else if(!strcmp(type, "list") ){
-        printf("Pedido\n");
         request_code = 7;
 
         // Evita um string overread no read
@@ -113,7 +107,7 @@ int main(int argc, char **argv) {
             fprintf(stdout, "NO BOXES FOUND\n");
             return -1;
         }
-        printf("LISTING:\n");
+        printf("RECEBEU:\n");
         fprintf(stdout, "%s %zu %zu %zu\n", box.box_name, box.box_size, box.n_publishers, box.n_subscribers);
 
         while(box.last != 1){
