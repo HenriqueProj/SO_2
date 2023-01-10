@@ -3,6 +3,9 @@
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
+#include <fcntl.h> // for open
+#include <unistd.h> // for close
+
 
 int n_messages;
 char* sub_name;
@@ -32,15 +35,28 @@ int main(int argc, char **argv) {
     
     sub_name = argv[2];
 
-    fill_string(PIPE_NAME_SIZE, sub_pipename);
-    fill_string(BOX_NAME_SIZE, box_name);
 
-    if( !create_pipe(sub_pipename) || !open_pipe(register_pipe, 'w'))
+    int register_int = open_pipe(register_pipe, 'w');
+
+    if( !create_pipe(sub_pipename) || !register_int)
         return -1;
 
-    // TODO: Envia o pedido de registo
-    //...
+    uint8_t code = 2;
+    register_request_t request;
 
+    strcpy(request.client_name_pipe_path, sub_pipename);
+    strcpy(request.box_name, box_name);
+
+    fill_string(PIPE_NAME_SIZE, request.client_name_pipe_path);
+    fill_string(BOX_NAME_SIZE, request.box_name);
+
+    if(write(register_int, &code, sizeof(uint8_t)) < 1)
+        exit(EXIT_FAILURE);
+    if(write(register_int, &request, sizeof(register_request_t)) < 1)
+        exit(EXIT_FAILURE);
+
+    printf("PEDIU O REGISTO DE SUBSCRIBER\n");
+        
     // registou !!
     int tx = open_pipe(sub_pipename, 'r');
     if(tx == 0)
