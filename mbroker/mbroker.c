@@ -129,9 +129,9 @@ void reply_to_box_creation(char* pipe_name, int n) {
     //error creating box
     if(n == 0) {
         reply.return_code = -1;
-        strcpy(reply.error_message, "ERROR: Couldn't create box");
+        strcpy(reply.error_message, "Couldn't create box");
     }
-
+    
     int manager_pipe = open_pipe(pipe_name, 'w');
 
 
@@ -151,17 +151,27 @@ void create_box(int register_pipe) {
    
     if(bytes_read == -1){
         reply_to_box_creation(box_request.client_name_pipe_path, 0);
+        return;
     }
     int file_handle = find_in_dir(inode_get(ROOT_DIR_INUM), box_request.box_name + 1);
     
     //the box already exists
     if(file_handle != -1){
         reply_to_box_creation(box_request.client_name_pipe_path, 0);
+        return;
     }
+    for(int cont = 0; cont < n_boxes; cont++){
+        if(!strcmp(boxes[cont].box_name, box_request.box_name) ){
+            reply_to_box_creation(box_request.client_name_pipe_path, 0);
+            return;
+        }
+    }
+
     int box_handle = tfs_open(box_request.box_name, TFS_O_CREAT);
 
     if(box_handle == -1){
         reply_to_box_creation(box_request.client_name_pipe_path, 0);
+        return;
     }
     box.box_size = 0;
     box.n_publishers = 0;
