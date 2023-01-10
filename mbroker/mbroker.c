@@ -71,31 +71,55 @@ void delete_box(box_t box){
     }
 }
 */
-bool register_publisher(char* client_named_pipe_path, box_t box){
+void publisher_function(int register_pipe){
+    box_t box;
+    register_request_t request;
+    read_pipe(register_pipe, &request, sizeof(register_request_t));
 
-    char* box_name = box.box_name;
-
-    inode_t *root_dir_inode = inode_get(ROOT_DIR_INUM);
-
-    int box_handle = find_in_dir(root_dir_inode, box_name + 1);
-    
+    int box_handle = find_in_dir(inode_get(ROOT_DIR_INUM), request.box_name + 1);
+  
     // Box não existe
-    if( box_handle == -1)
-        return false;
+    if(box_handle == -1)
+        return;
     
+    int ver = -1;
+
+    for(int i = 0; i < n_boxes; i++){
+        if( !strcmp(boxes[i].box_name, request.box_name) ){
+            box = boxes[i];
+            ver = 1;
+            break;
+        }
+    }
+
+    // Não está no array de boxes
+    if(ver == -1)
+        return;
+
     // Há um publisher na box
-    if(box.publisher != NULL)
-        return false;
-    
+    if(box.n_publishers != 0)
+        return;
+
     // Nao consegue criar o pipe do publisher 
-    if(!create_pipe(client_named_pipe_path) )
-        return false;
+    if(!create_pipe(request.client_name_pipe_path) )
+        return;
 
     // Success!!
-    strcpy(box.publisher, client_named_pipe_path);
-    box.n_publishers++;
+    box.n_publishers = 1;
 
-    return true;
+    printf("Great Success!\n");
+
+    // FIM DO REGISTO
+    uint8_t code;
+    char message[MESSAGE_SIZE];
+
+    int pub_pipe = open_pipe(request.client_name_pipe_path, 'r');
+
+    while((read_pipe(pub_pipe, &code, sizeof(uint8_t))) != -1) {
+        read_pipe(pub_pipe, &message, MESSAGE_SIZE);
+    
+        printf("%s", message);
+    }
 }
 
 bool register_subscriber(char* client_named_pipe_path, box_t box){
@@ -343,6 +367,7 @@ int main(int argc, char **argv) {
         switch(code) {
         case 1:
                 //register publisher
+                publisher_function(register_pipe);
                 break;
         case 2:
                 //register subscriber
