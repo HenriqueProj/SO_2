@@ -48,6 +48,9 @@ int main(int argc, char **argv) {
         strcpy(request.client_name_pipe_path, pipe_name);
         strcpy(request.box_name, box_name);
 
+        fill_string(PIPE_NAME_SIZE, request.client_name_pipe_path);
+        fill_string(PIPE_NAME_SIZE, request.box_name);
+
         if(write(register_pipe, &request_code, sizeof(uint8_t)) < 1)
             exit(EXIT_FAILURE);
         if(write(register_pipe, &request, sizeof(register_request_t)) < 1)
@@ -91,7 +94,7 @@ int main(int argc, char **argv) {
         close(tx);
 
         if(box_reply.return_code == -1){
-            fprintf(stdout, "ERROR %s\n", box_reply.error_message);
+            fprintf(stdout, "ERROR: %s\n", box_reply.error_message);
             return -1;
         }
 

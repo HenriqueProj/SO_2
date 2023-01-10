@@ -23,8 +23,8 @@
 box_t boxes[MAX_BOXES];
 int n_boxes;
 
-void box_swap(int i){
-    char* string_aux = "";
+void delete_box(int i){
+    char string_aux[PIPE_NAME_SIZE];
     uint64_t int_aux;
     uint8_t last_aux;
 
@@ -59,7 +59,7 @@ void add_box(box_t box){
     boxes[n_boxes] = box;
     n_boxes++;
 }
-
+/*
 void delete_box(box_t box){
     char* box_name;
     for(int i = 0; i < n_boxes; i++){
@@ -70,7 +70,7 @@ void delete_box(box_t box){
         }
     }
 }
-
+*/
 bool register_publisher(char* client_named_pipe_path, box_t box){
 
     char* box_name = box.box_name;
@@ -196,7 +196,7 @@ void reply_to_box_removal(char* pipe_name, int n) {
     //error creating box
     if(n == 0) {
         reply.return_code = -1;
-        strcpy(reply.error_message, "ERROR: Could'nt create box");
+        strcpy(reply.error_message, "Couldn't remove box");
     } 
 
    int manager_pipe = open_pipe(pipe_name, 'w');
@@ -213,28 +213,49 @@ void reply_to_box_removal(char* pipe_name, int n) {
 }
 
 void remove_box(int register_pipe) {
-    box_t box;
     register_request_t box_request;
     
     ssize_t bytes_read = read_pipe(register_pipe, &box_request, sizeof(register_request_t));
 
-    if(bytes_read == -1)
+    if(bytes_read == -1){
         reply_to_box_removal(box_request.client_name_pipe_path, 0);
-  
-    //verificar se está no array global??
-
+        return;
+    }
+    printf("1\n");
     //the box doesn't exist
-    if(find_in_dir(inode_get(ROOT_DIR_INUM), box_request.box_name) == -1)
-        reply_to_box_removal(box_request.client_name_pipe_path, 0);
-
+    //if(find_in_dir(inode_get(ROOT_DIR_INUM), box_request.box_name) == -1){
+    //    reply_to_box_removal(box_request.client_name_pipe_path, 0);
+    //    return;
+    //}
+    printf("2\n");
     //unlink file associated to box
     int box_handle = tfs_unlink(box_request.box_name);
 
-    if(box_handle == -1) 
+    if(box_handle == -1){
         reply_to_box_removal(box_request.client_name_pipe_path, 0);
- 
+        return;
+    }
+    printf("3\n");
+
+    //verifica se está no array global
+    int ver = -1;
+
+    for(int cont = 0; cont < n_boxes; cont++){
+        if(!strcmp(boxes[cont].box_name, box_request.box_name)){
+            // Índice da box no array
+            ver = cont;
+            break;
+        }
+    }
+    // Box não está no array global
+    if(ver == -1){
+        reply_to_box_removal(box_request.client_name_pipe_path, 0);
+        return;
+    }
+
     //free box from array
-    delete_box(box);
+    printf("%s %s\n", box_request.box_name, boxes[ver].box_name);
+    delete_box(ver);
 
     reply_to_box_removal(box_request.client_name_pipe_path, 1);
 
