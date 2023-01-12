@@ -7,13 +7,13 @@
 #include <unistd.h> // for close
 
 
-int n_messages;
+int n_messages = 0;
 char* sub_name;
 
 static void handle() {
 
     fprintf(stdout, "Subscriber %s recebeu %d mensagens\n", sub_name, n_messages);
-    return;
+    exit(1);
 }
 
 static void sig_handler(int sig) {
@@ -65,15 +65,17 @@ int main(int argc, char **argv) {
     char message[MESSAGE_SIZE];
 
     ssize_t bytes_read = read_pipe(tx, &message, MESSAGE_SIZE);
-    n_messages++;
 
     // Só sai em caso de erro do read ou SIGINT
     // FIXME : Espera ativa?
+    int n = 1;
     while(bytes_read != -1){
 
         // Caso ainda não tenha lido tudo
         if(bytes_read > 0){
             // Imprime a mensagem e reseta o buffer
+            fprintf(stdout, "reading for the %d time\n", n);
+            n++;
             fprintf(stdout, "%s\n", message);
             memset(message, 0, MESSAGE_SIZE);
             n_messages++;
@@ -85,6 +87,7 @@ int main(int argc, char **argv) {
 
         bytes_read = read_pipe(tx, &message, MESSAGE_SIZE);
     }
+
 
     // Saiu do loop por erro
     fprintf(stderr, "[ERR]: read failed: %s\n", strerror(errno));
