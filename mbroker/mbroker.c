@@ -60,6 +60,25 @@ void add_box(box_t box){
     n_boxes++;
 }
 
+        if( !strcmp(box_name, box.box_name) ){
+            box_swap(i);
+        }
+    }
+}
+
+int find_box(char* box_name) {
+    char* name;
+    for(int i = 0; i < n_boxes; i++){
+        name = boxes[i].box_name;
+
+        if(!strcmp(name, box_name) ){
+            return i;
+        }
+    }
+    return -1;
+
+}
+*/
 void publisher_function(int register_pipe){
     box_t box;
     register_request_t request;
@@ -110,25 +129,34 @@ void publisher_function(int register_pipe){
     close(box_handle);
 }
 
-bool register_subscriber(char* client_named_pipe_path, box_t box){
-    char* box_name = box.box_name;
+void register_subscriber(int register_pipe){
+    box_t box;    
+    register_request_t subscriber_request;
+    ssize_t bytes_read = read_pipe(register_pipe, &subscriber_request, sizeof(register_request_t));
+   
+    if(bytes_read == -1){
+        return;
+    }
 
     inode_t *root_dir_inode = inode_get(ROOT_DIR_INUM);
 
-    int box_handle = find_in_dir(root_dir_inode, box_name + 1);
+    int box_handle = find_in_dir(root_dir_inode, subscriber_request.box_name + 1);
     
     // Box não existe
-    if( box_handle == -1)
-        return false;
-    
-    // Nao consegue criar o pipe do publisher 
-    if(!create_pipe(client_named_pipe_path) )
-        return false;
+    if( box_handle == -1) {
+        return;
+    }
+
+    int box_index = find_box(subscriber_request.box_name);
+
+    box = boxes[box_index];
 
     // Success!!
     box.n_subscribers++;
 
-    return true;
+    //Subscriber created sucessfully, will wait for messages to be written in message box
+
+    return;
 }
 
 void reply_to_box_creation(char* pipe_name, int n) {
@@ -359,6 +387,7 @@ int main(int argc, char **argv) {
                 break;
         case 2:
                 //register subscriber
+                register_subscriber(register_pipe);
                 break;
         case 3:
                 //create box
