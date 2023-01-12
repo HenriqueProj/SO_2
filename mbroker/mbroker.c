@@ -350,6 +350,53 @@ void publisher_messages(int register_pipe){
     read_pipe(register_pipe, &pub_pipe, PIPE_NAME_SIZE);
 }
 
+void* main_thread_function(void* arg){
+    int* register_pipe = (int*) arg;
+
+    uint8_t code;
+
+    ssize_t bytes_read; //= read_pipe(register_pipe, &code, sizeof(uint8_t));
+   
+    while((bytes_read = read_pipe(*register_pipe, &code, sizeof(uint8_t))) != -1) {
+        //if(bytes_read > 0){
+        //}
+        switch(code) {
+        case 1:
+                //register publisher
+                publisher_function(*register_pipe);
+                break;
+        case 2:
+                //register subscriber
+                register_subscriber(*register_pipe);
+                break;
+        case 3:
+                //create box
+                printf("Entrou!\n");
+                create_box(*register_pipe);
+                break;
+        case 5:
+                //box removal
+                printf("Entrou!\n");
+                remove_box(*register_pipe);
+                break;
+        case 7:
+                printf("A ENVIAR:\n");
+                list_boxes(*register_pipe);
+                break;
+        case 9:
+                //messages sent from publisher to server
+                publisher_messages(*register_pipe);
+                break;
+        case 10:
+                //messages sent from server to subscriber
+                break;
+        default:
+                break;
+        }
+        code = 0;
+    }
+    return NULL;
+}
 
 int main(int argc, char **argv) {
     (void)argc;
@@ -361,54 +408,20 @@ int main(int argc, char **argv) {
     //int max_sessions = (int) argv[2];
     //pthread_t tid[max_sessions];
 
+    pthread_t main_thread;
+
     // Cria register_pipe
     if(!create_pipe(register_pipe_name))
         return -1;
 
     int register_pipe = open_pipe(register_pipe_name, 'r'); 
 
-    uint8_t code;
+    if(pthread_create(&main_thread, NULL, main_thread_function, (void*)&register_pipe ) != 0){
+        fprintf(stderr, "[ERR]: Fail to create main thread: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
 
-    ssize_t bytes_read; //= read_pipe(register_pipe, &code, sizeof(uint8_t));
-   
-    while((bytes_read = read_pipe(register_pipe, &code, sizeof(uint8_t))) != -1) {
-        //if(bytes_read > 0){
-        //}
-        switch(code) {
-        case 1:
-                //register publisher
-                publisher_function(register_pipe);
-                break;
-        case 2:
-                //register subscriber
-                register_subscriber(register_pipe);
-                break;
-        case 3:
-                //create box
-                printf("Entrou!\n");
-                create_box(register_pipe);
-                break;
-        case 5:
-                //box removal
-                printf("Entrou!\n");
-                remove_box(register_pipe);
-                break;
-        case 7:
-                printf("A ENVIAR:\n");
-                list_boxes(register_pipe);
-                break;
-        case 9:
-                //messages sent from publisher to server
-                publisher_messages(register_pipe);
-                break;
-        case 10:
-                //messages sent from server to subscriber
-                break;
-        default:
-                break;
-        }
-        code = 0;
-    }        
+    pthread_join(main_thread, NULL);
 
     fprintf(stderr, "usage: mbroker <pipename>\n");
     return 0;
