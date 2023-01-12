@@ -113,9 +113,8 @@ void publisher_function(int register_pipe){
 
     while((read_pipe(pub_pipe, &code, sizeof(uint8_t))) > 0) {
         read_pipe(pub_pipe, &message, MESSAGE_SIZE);
-        message[strlen(message)] = '\0';
 
-        tfs_write(box_handle, message, strlen(message) ); 
+        tfs_write(box_handle, message, strlen(message)); 
 
         printf("%s", message);
         // FIXME : 
@@ -123,11 +122,35 @@ void publisher_function(int register_pipe){
     close(box_handle);
 }
 
+void read_messages(register_request_t subscriber_request) {
+     
+    int box_handle = tfs_open(subscriber_request.box_name, 0);
+    int subscriber_pipe = open_pipe(subscriber_request.client_name_pipe_path, 'w');
+
+    if(box_handle == -1 || subscriber_pipe == -1) {
+        return;
+    }
+
+    char buffer[MESSAGE_SIZE];
+    ssize_t bytes_read = tfs_read(box_handle, buffer, MESSAGE_SIZE);
+
+    while(bytes_read != 0) {
+        if(write(subscriber_pipe, &buffer, sizeof(char) * strlen(buffer)) < 1){
+            exit(EXIT_FAILURE);
+        }
+        printf("bytes read: %ld\n", bytes_read);
+        printf("%s\n", buffer);
+        bytes_read = tfs_read(box_handle, buffer, MESSAGE_SIZE);
+    }
+
+    close(box_handle);
+}
+
 void register_subscriber(int register_pipe){
     box_t box;    
     register_request_t subscriber_request;
     ssize_t bytes_read = read_pipe(register_pipe, &subscriber_request, sizeof(register_request_t));
-   
+    
     if(bytes_read == -1){
         return;
     }
@@ -148,7 +171,10 @@ void register_subscriber(int register_pipe){
     // Success!!
     box.n_subscribers++;
 
+    printf("\nSUBSCRIBER REGISTED\n");
+
     //Subscriber created sucessfully, will wait for messages to be written in message box
+    read_messages(subscriber_request);
 
     return;
 }
@@ -261,7 +287,6 @@ void remove_box(int register_pipe) {
     //    reply_to_box_removal(box_request.client_name_pipe_path, 0);
     //    return;
     //}
-    printf("2\n");
     //unlink file associated to box
     int box_handle = tfs_unlink(box_request.box_name);
 
@@ -269,7 +294,6 @@ void remove_box(int register_pipe) {
         reply_to_box_removal(box_request.client_name_pipe_path, 0);
         return;
     }
-    printf("3\n");
 
     //verifica se está no array global
     int ver = -1;
