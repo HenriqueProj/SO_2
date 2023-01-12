@@ -60,12 +60,6 @@ void add_box(box_t box){
     n_boxes++;
 }
 
-        if( !strcmp(box_name, box.box_name) ){
-            box_swap(i);
-        }
-    }
-}
-
 int find_box(char* box_name) {
     char* name;
     for(int i = 0; i < n_boxes; i++){
@@ -78,7 +72,7 @@ int find_box(char* box_name) {
     return -1;
 
 }
-*/
+
 void publisher_function(int register_pipe){
     box_t box;
     register_request_t request;
