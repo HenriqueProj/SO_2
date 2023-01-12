@@ -59,24 +59,13 @@ void add_box(box_t box){
     boxes[n_boxes] = box;
     n_boxes++;
 }
-/*
-void delete_box(box_t box){
-    char* box_name;
-    for(int i = 0; i < n_boxes; i++){
-        box_name = boxes[i].box_name;
 
-        if( !strcmp(box_name, box.box_name) ){
-            box_swap(i);
-        }
-    }
-}
-*/
 void publisher_function(int register_pipe){
     box_t box;
     register_request_t request;
     read_pipe(register_pipe, &request, sizeof(register_request_t));
 
-    int box_handle = find_in_dir(inode_get(ROOT_DIR_INUM), request.box_name + 1);
+    int box_handle = tfs_open(request.box_name, TFS_O_APPEND);
   
     // Box não existe
     if(box_handle == -1)
@@ -100,14 +89,8 @@ void publisher_function(int register_pipe){
     if(box.n_publishers != 0)
         return;
 
-    // Nao consegue criar o pipe do publisher 
-    if(!create_pipe(request.client_name_pipe_path) )
-        return;
-
     // Success!!
     box.n_publishers = 1;
-
-    printf("Great Success!\n");
 
     // FIM DO REGISTO
     uint8_t code;
@@ -115,11 +98,16 @@ void publisher_function(int register_pipe){
 
     int pub_pipe = open_pipe(request.client_name_pipe_path, 'r');
 
-    while((read_pipe(pub_pipe, &code, sizeof(uint8_t))) != -1) {
+    while((read_pipe(pub_pipe, &code, sizeof(uint8_t))) > 0) {
         read_pipe(pub_pipe, &message, MESSAGE_SIZE);
-    
+        message[strlen(message)] = '\0';
+
+        tfs_write(box_handle, message, strlen(message) ); 
+
         printf("%s", message);
+        // FIXME : 
     }
+    close(box_handle);
 }
 
 bool register_subscriber(char* client_named_pipe_path, box_t box){

@@ -13,9 +13,6 @@ int main(int argc, char **argv) {
     char* pub_pipename = argv[2];
     char* box_name = argv[3];
 
-    //fill_string(PIPE_NAME_SIZE, pub_pipename);
-    //fill_string(BOX_NAME_SIZE, box_name);
-
     int register_int = open_pipe(register_pipe, 'w');
 
     if( !create_pipe(pub_pipename) || !register_int)
@@ -34,7 +31,6 @@ int main(int argc, char **argv) {
             exit(EXIT_FAILURE);
     if(write(register_int, &request, sizeof(register_request_t)) < 1)
             exit(EXIT_FAILURE);
-    printf("PEDIU O REGISTO DE PUBLISHER\n");
 
     close(register_int);
 
@@ -47,13 +43,15 @@ int main(int argc, char **argv) {
     if(tx == -1)
         return -1;
 
-    printf("PIPE OPENED\n");
-
     while(fgets(str, MESSAGE_SIZE, stdin) != NULL){
-        printf("A\n");
         strcpy(message, str);
-        printf("A\n");
-        fill_string(MESSAGE_SIZE, message);
+  
+        size_t len = strlen(message);
+
+        if(len == MESSAGE_SIZE)
+            message[MESSAGE_SIZE - 1] = '\0';
+        else
+            message[len] = '\0';
 
         // Envia mensagem pelo pipe ao server
         code = 9;
@@ -62,7 +60,6 @@ int main(int argc, char **argv) {
             exit(EXIT_FAILURE);
         if(write(tx, &str, sizeof(char)*MESSAGE_SIZE) < 1)
             exit(EXIT_FAILURE);
-        printf("Nova Mensagem!\n");
     }
 
     close(tx);

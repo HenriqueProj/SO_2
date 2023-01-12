@@ -33,6 +33,7 @@ int open_pipe(char* pipename, char mode){
         tx = open(pipename, O_RDONLY);
         
     if (tx == -1) {
+        printf("Pipe: %s\n", pipename);
         fprintf(stderr, "[ERR]: open failed: %s\n", strerror(errno));
     }
     return tx;
