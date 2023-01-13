@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <utils.h>
 
 int create_pipe(char* pipename){
     // Remove pipe if it does not exist
@@ -70,4 +71,11 @@ ssize_t read_pipe(int rx, void* buffer, size_t size){
         return -1;
     }
     return ret;
+}
+
+int compare_structs(const void* a, const void* b) {
+    char const *l = ((box_t *)a)->box_name;
+    char const *r = ((box_t *)b)->box_name;
+
+    return strcmp(l , r);
 }

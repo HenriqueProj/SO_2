@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+// Maximo de boxes, equivalente ao numero maximo de inodes do tfs
+#define MAX_BOXES 64
 #define PIPE_NAME_SIZE 256
 #define BOX_NAME_SIZE 32
 #define MESSAGE_SIZE 1024
@@ -46,6 +48,7 @@ int create_pipe(char* pipename);
 int open_pipe(char* pipename, char mode);
 /*void write_pipe(int tx, char const *str);*/
 void fill_string(size_t size, char* array);
-int read_pipe(int rx, void* buffer, int size);
+ssize_t read_pipe(int rx, void* buffer, size_t size);
+int compare_structs(const void* a, const void* b);
 
 #endif

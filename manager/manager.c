@@ -10,6 +10,8 @@ int main(int argc, char **argv) {
     char* type = argv[3];
     char* box_name;
     
+    box_t boxes[MAX_BOXES];
+    size_t n_boxes = 0;
     // Funciona
 
     if(argc > 4) {
@@ -30,6 +32,7 @@ int main(int argc, char **argv) {
         
         register_request_t request;
         strcpy(request.client_name_pipe_path, pipe_name);
+
         strcpy(request.box_name, box_name);
 
         fill_string(PIPE_NAME_SIZE, request.client_name_pipe_path);
@@ -39,12 +42,12 @@ int main(int argc, char **argv) {
             exit(EXIT_FAILURE);
         if(write(register_pipe, &request, sizeof(register_request_t)) < 1)
             exit(EXIT_FAILURE);
-        printf("PEDIU A CRIAÇÂO\n");
     }
     // Pedido de remoção de caixa
     else if(!strcmp(type, "remove") ){
         request_code = 5;
         register_request_t request;
+        
         strcpy(request.client_name_pipe_path, pipe_name);
         strcpy(request.box_name, box_name);
 
@@ -55,7 +58,6 @@ int main(int argc, char **argv) {
             exit(EXIT_FAILURE);
         if(write(register_pipe, &request, sizeof(register_request_t)) < 1)
             exit(EXIT_FAILURE);
-        printf("PEDIU A REMOÇÂO\n");
     }
     // Pedido de listagem de caixas
     else if(!strcmp(type, "list") ){
@@ -67,6 +69,7 @@ int main(int argc, char **argv) {
         strcpy(named_pipe, pipe_name);
 
         fill_string(PIPE_NAME_SIZE, named_pipe);
+
 
         if(write(register_pipe, &request_code, sizeof(uint8_t)) < 1)
             exit(EXIT_FAILURE);
@@ -113,16 +116,21 @@ int main(int argc, char **argv) {
             fprintf(stdout, "NO BOXES FOUND\n");
             return -1;
         }
-        printf("RECEBEU:\n");
-        fprintf(stdout, "%s %zu %zu %zu\n", box.box_name, box.box_size, box.n_publishers, box.n_subscribers);
+        boxes[0] = box;
+        n_boxes++;
 
         while(box.last != 1){
             read_pipe(tx, &box, sizeof(box_t));
-
-            fprintf(stdout, "%s %zu %zu %zu\n", box.box_name, box.box_size, box.n_publishers, box.n_subscribers);
+            boxes[n_boxes] = box;
+            n_boxes++;
         }
         close(tx);
-        
+
+        if(n_boxes > 1)
+            qsort(&boxes[0], n_boxes, sizeof(box_t), &compare_structs);
+
+        for(int i = 0; i < n_boxes; i++)
+            fprintf(stdout, "%s %zu %zu %zu\n", boxes[i].box_name, boxes[i].box_size, boxes[i].n_publishers, boxes[i].n_subscribers);
     }   
     else    
         return -1;
