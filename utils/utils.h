@@ -21,6 +21,11 @@ typedef struct {
     char pipename[PIPE_NAME_SIZE];
 } pub_args_t;
 
+typedef struct {
+    char pipename[PIPE_NAME_SIZE];
+    int mode;
+} manager_args_t;
+
 typedef struct __attribute__((__packed__)){
     char box_name[BOX_NAME_SIZE];
     char publisher[PIPE_NAME_SIZE];

@@ -54,8 +54,6 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     if(write(register_int, &request, sizeof(register_request_t)) < 1)
         exit(EXIT_FAILURE);
-
-    printf("PEDIU O REGISTO DE SUBSCRIBER\n");
         
     // registou !!
     int tx = open_pipe(sub_pipename, 'r');
