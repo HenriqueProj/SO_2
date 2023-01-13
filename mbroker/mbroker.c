@@ -70,6 +70,53 @@ int find_box(char* box_name) {
 
 }
 
+void add_subscriber_to_box(int box_index, char* subscriber_pipe_name) {
+    int i = boxes[box_index].subscriber_index;
+    strncpy(boxes[box_index].subscribers[i], subscriber_pipe_name, PIPE_NAME_SIZE);
+    boxes[box_index].subscriber_index++;
+}
+
+
+void recieve_messages_from_publisher(register_request_t publisher, int box_index){
+    char box_name[BOX_NAME_SIZE];
+    box_name[0] = '/';
+    strcpy(box_name+1, publisher.box_name);
+
+    int box_handle = tfs_open(box_name, TFS_O_APPEND);
+
+    uint8_t code;
+    uint8_t subscriber_code = 10;
+    char message[MESSAGE_SIZE];
+    char buffer[MESSAGE_SIZE];
+
+    int pub_pipe = open_pipe(publisher.client_name_pipe_path, 'r');
+
+    ssize_t bytes_read = read_pipe(pub_pipe, &code, sizeof(uint8_t));
+    while(bytes_read > 0 && code == 9) {
+        read_pipe(pub_pipe, &buffer, MESSAGE_SIZE);
+        strcpy(message, buffer);
+        message[strlen(buffer)] = '\0';
+        tfs_write(box_handle, message, strlen(message)); 
+        tfs_write(box_handle, "\0", sizeof(char));
+        boxes[box_index].box_size += strlen(message);
+        printf("%s\n", message);
+        
+        for(int i = 0; i < boxes[box_index].subscriber_index; i++) {
+            int subscriber_pipe = open_pipe(boxes[box_index].subscribers[i], 'w');
+            if(write(subscriber_pipe, &subscriber_code, sizeof(uint8_t)) < 1){
+                exit(EXIT_FAILURE);
+            }
+            if(write(subscriber_pipe, &buffer, MESSAGE_SIZE) < 1) {
+                exit(EXIT_FAILURE);
+            }
+        }
+        bytes_read = read_pipe(pub_pipe, &code, sizeof(uint8_t));
+    }  
+    boxes[box_index].n_publishers = 0;
+    close(pub_pipe);  
+    tfs_close(box_handle);
+}
+
 void publisher_function(int register_pipe){
     register_request_t request;
     read_pipe(register_pipe, &request, sizeof(register_request_t));
@@ -94,22 +141,9 @@ void publisher_function(int register_pipe){
     boxes[box_index].n_publishers = 1;
 
     // FIM DO REGISTO
-    uint8_t code;
-    char message[MESSAGE_SIZE];
-
-    int pub_pipe = open_pipe(request.client_name_pipe_path, 'r');
-
-    while((read_pipe(pub_pipe, &code, sizeof(uint8_t))) > 0) {
-        read_pipe(pub_pipe, &message, MESSAGE_SIZE);
-        message[strlen(message)] = '\0';
-        printf("from pipe:");
-        tfs_write(box_handle, message, strlen(message)); 
-        tfs_write(box_handle, "\0", sizeof(char));
-        printf("%s", message);
-        // FIXME : 
-    }
-    close(box_handle);
+    recieve_messages_from_publisher(request, box_index);
 }
+
 
 void read_messages(register_request_t subscriber_request) {
     char box_name[BOX_NAME_SIZE];
@@ -122,14 +156,20 @@ void read_messages(register_request_t subscriber_request) {
         return;
     }
 
+    uint8_t code = 10;
     char char_buffer;
     char buffer[MESSAGE_SIZE];
     int i = 0;
     ssize_t bytes_read = tfs_read(box_handle, &char_buffer, sizeof(char));
+
     while(bytes_read > 0) {
         if(char_buffer == '\0') {
             buffer[i] = '\0';
+            printf("initial messages:%s\n", buffer);
             fill_string(MESSAGE_SIZE, buffer);
+            if(write(subscriber_pipe, &code, sizeof(uint8_t)) < 1) {
+                exit(EXIT_FAILURE);
+            }
             if(write(subscriber_pipe, &buffer, MESSAGE_SIZE) < 1){
                 exit(EXIT_FAILURE);
             }
@@ -144,13 +184,15 @@ void read_messages(register_request_t subscriber_request) {
         bytes_read = tfs_read(box_handle, &char_buffer, sizeof(char));
     }
 
-    close(box_handle);
+    tfs_close(box_handle);
+    close(subscriber_pipe);
 }
 
 void register_subscriber(int register_pipe){
     register_request_t subscriber_request;
     ssize_t bytes_read = read_pipe(register_pipe, &subscriber_request, sizeof(register_request_t));
     
+    printf("Beginnig to register subscriber\n");
     if(bytes_read == -1){
         return;
     }
@@ -160,7 +202,7 @@ void register_subscriber(int register_pipe){
     int box_handle = find_in_dir(root_dir_inode, subscriber_request.box_name);
     
     // Box não existe
-    if( box_handle == -1) {
+    if(box_handle == -1) {
         return;
     }
 
@@ -169,10 +211,9 @@ void register_subscriber(int register_pipe){
     if(box_index == -1)
         return;
 
+    printf("finished registering subscriber\n");
     boxes[box_index].n_subscribers++;
-
-    printf("\nSUBSCRIBER REGISTED\n");
-
+    add_subscriber_to_box(box_index, subscriber_request.client_name_pipe_path);
     //Subscriber created sucessfully, will wait for messages to be written in message box
     read_messages(subscriber_request);
 
@@ -242,6 +283,9 @@ void create_box(int register_pipe) {
     box.n_subscribers = 0;
     strcpy(box.box_name, box_request.box_name);
     
+    if (pthread_cond_init(&box.condition, NULL) != 0)
+        return;
+
     tfs_close(box_handle);
     reply_to_box_creation(box_request.client_name_pipe_path, 1);
 
@@ -278,21 +322,22 @@ void reply_to_box_removal(char* pipe_name, int n) {
 
 void remove_box(int register_pipe) {
     register_request_t box_request;
-    
+    char box_name[BOX_NAME_SIZE];
+    box_name[0] = '/';
     ssize_t bytes_read = read_pipe(register_pipe, &box_request, sizeof(register_request_t));
 
     if(bytes_read == -1){
         reply_to_box_removal(box_request.client_name_pipe_path, 0);
         return;
     }
-    printf("1\n");
+    strcpy(box_name+1, box_request.box_name);
     //the box doesn't exist
     //if(find_in_dir(inode_get(ROOT_DIR_INUM), box_request.box_name) == -1){
     //    reply_to_box_removal(box_request.client_name_pipe_path, 0);
     //    return;
     //}
     //unlink file associated to box
-    int box_handle = tfs_unlink(box_request.box_name);
+    int box_handle = tfs_unlink(box_name);
 
     if(box_handle == -1){
         reply_to_box_removal(box_request.client_name_pipe_path, 0);
@@ -316,7 +361,6 @@ void remove_box(int register_pipe) {
     }
 
     //free box from array
-    printf("%s %s\n", box_request.box_name, boxes[ver].box_name);
     delete_box(ver);
 
     reply_to_box_removal(box_request.client_name_pipe_path, 1);
@@ -371,11 +415,6 @@ void list_boxes(int register_pipe){
     reply_to_list_boxes(manager_pipe);
 }
 
-void publisher_messages(int register_pipe){
-    char pub_pipe[PIPE_NAME_SIZE];
-
-    read_pipe(register_pipe, &pub_pipe, PIPE_NAME_SIZE);
-}
 
 void* main_thread_function(void* arg){
     int* register_pipe = (int*) arg;
@@ -406,10 +445,10 @@ void* main_thread_function(void* arg){
                 break;
         case 7:
                 list_boxes(*register_pipe);
-                break;
+                break; 
+        //are case 9 and 10 needed??
         case 9:
                 //messages sent from publisher to server
-                publisher_messages(*register_pipe);
                 break;
         case 10:
                 //messages sent from server to subscriber

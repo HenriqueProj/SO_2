@@ -55,21 +55,20 @@ int main(int argc, char **argv) {
     if(write(register_int, &request, sizeof(register_request_t)) < 1)
         exit(EXIT_FAILURE);
 
-    printf("PEDIU O REGISTO DE SUBSCRIBER\n");
         
     // registou !!
     int tx = open_pipe(sub_pipename, 'r');
     if(tx == 0)
         return -1;
 
-    char message[MESSAGE_SIZE];
 
-    ssize_t bytes_read = read_pipe(tx, &message, MESSAGE_SIZE);
+    char message[MESSAGE_SIZE];
+    ssize_t bytes_read = read_pipe(tx, &code, sizeof(uint8_t));
 
     // Só sai em caso de erro do read ou SIGINT
     // FIXME : Espera ativa?
-    while(bytes_read != -1){
-
+    while(bytes_read != -1 && code == 10){
+        read_pipe(tx, &message, MESSAGE_SIZE);
         // Caso ainda não tenha lido tudo
         if(bytes_read > 0){
             // Imprime a mensagem e reseta o buffer
@@ -82,10 +81,21 @@ int main(int argc, char **argv) {
         if (signal(SIGINT, sig_handler) == SIG_ERR) 
             return -1;
 
-        bytes_read = read_pipe(tx, &message, MESSAGE_SIZE);
+        bytes_read = read_pipe(tx, &code, sizeof(uint8_t));
     }
 
+    /*bytes_read = read_pipe(tx, &code, sizeof(uint8_t));
 
+    while(bytes_read > 0) {
+        if(code == 10) {
+            read_pipe(tx, &message, MESSAGE_SIZE);
+            fprintf(stdout, "%s\n", message);
+            memset(message, 0, MESSAGE_SIZE);
+            n_messages++;
+        }
+        bytes_read = read_pipe(tx, &code, sizeof(uint8_t));
+    }
+    */
     // Saiu do loop por erro
     fprintf(stderr, "[ERR]: read failed: %s\n", strerror(errno));
     return 0;

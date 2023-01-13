@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <pthread.h>
 
 // Maximo de boxes, equivalente ao numero maximo de inodes do tfs
 #define MAX_BOXES 64
@@ -11,16 +12,26 @@
 #define BOX_NAME_SIZE 32
 #define MESSAGE_SIZE 1024
 
-typedef struct __attribute__((__packed__)){
+//tive de tirar o attribute packed por causa da variável de condição
+typedef struct {
     char box_name[BOX_NAME_SIZE];
     char publisher[PIPE_NAME_SIZE];
 
     uint64_t box_size;
     uint64_t n_publishers;
     uint64_t n_subscribers;
-
+    char subscribers[MAX_BOXES][PIPE_NAME_SIZE];
+    int subscriber_index;
     uint8_t last;
+    pthread_cond_t condition;
+
 } box_t;
+
+typedef struct __attribute__((__packed__)) {
+    char client_name_pipe_path[PIPE_NAME_SIZE];
+    char box_name[BOX_NAME_SIZE];
+    struct subscriber *next;
+} subscriber;
 
 // Structs para envio de pedidos por pipes
 

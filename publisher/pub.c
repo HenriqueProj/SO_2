@@ -43,6 +43,8 @@ int main(int argc, char **argv) {
     if(tx == -1)
         return -1;
 
+    code = 9;
+    
     while(fgets(str, MESSAGE_SIZE, stdin) != NULL){
         strcpy(message, str);
   
@@ -50,6 +52,8 @@ int main(int argc, char **argv) {
 
         if(len == MESSAGE_SIZE)
             message[MESSAGE_SIZE - 1] = '\0';
+        else if(len == 0) 
+            message[0] = '\0';
         else {
             message[len -1 ] = '\0';
             fill_string(MESSAGE_SIZE, message);

@@ -13,12 +13,17 @@
 
 int create_pipe(char* pipename){
     // Remove pipe if it does not exist
-    if (unlink(pipename) != 0 && errno != ENOENT) {
+    char src[6] = "/tmp/";
+    char *source;
+    source = malloc(sizeof(char) * strlen(src) + 1);
+    strcpy(source, src);
+    strcat(source, pipename);
+    if (unlink(source) != 0 && errno != ENOENT) {
         printf("Register pipe: Destroy failed");
         return 0;
     }
     // Create pipe
-    if (mkfifo(pipename, 0640) != 0) {
+    if (mkfifo(source, 0640) != 0) {
         printf("Register pipe: mkfifo failed");
         return 0;
     }
@@ -28,14 +33,18 @@ int create_pipe(char* pipename){
 
 int open_pipe(char* pipename, char mode){
     int tx;
+    char src[6] = "/tmp/";
+    char *source;
+    source = malloc(sizeof(char) * strlen(src) + 1);
+    strcpy(source, src);
+    strcat(source, pipename);
     if(mode == 'w')
-        tx = open(pipename, O_WRONLY);
+        tx = open(source, O_WRONLY);
     else
-        tx = open(pipename, O_RDONLY);
-        
+        tx = open(source, O_RDONLY);
     if (tx == -1) {
-        printf("Pipe: %s\n", pipename);
         fprintf(stderr, "[ERR]: open failed: %s\n", strerror(errno));
+        return 0;
     }
     return tx;
 }
