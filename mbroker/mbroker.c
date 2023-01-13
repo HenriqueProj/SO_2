@@ -100,6 +100,8 @@ void* write_messages(void* arg){
     tfs_close(box_handle);
     close(pub_pipe);
 
+    n_active_threads--;
+
     return NULL;
 }
 
@@ -187,6 +189,7 @@ void* read_messages(void* args) {
         }
         bytes_read = tfs_read(box_handle, &char_buffer, sizeof(char));
     }
+    n_active_threads--;
 
     tfs_close(box_handle);
 
@@ -259,6 +262,8 @@ void* reply_to_box_creation(void* arg) {
         exit(EXIT_FAILURE);
     }
     close(manager_pipe);
+
+    n_active_threads--;
 
     return NULL;
 }
@@ -353,7 +358,8 @@ void* reply_to_box_removal(void* arg) {
         printf("Writing error\n");
         exit(EXIT_FAILURE);
     }
-
+    n_active_threads--;
+    
     return NULL;
 }
 
@@ -420,11 +426,12 @@ void remove_box(int register_pipe) {
 }
 
 void* reply_to_list_boxes(void* args){
-    char** manager_pipe = (char**)args;
+    
+    char* manager_pipe = (void*)args;
     uint8_t code = 8;
     box_t reply_box;
-
-    int man_pipe = open_pipe(*manager_pipe, 'w');
+    
+    int man_pipe = open_pipe(manager_pipe, 'w');
 
     int i = 0;
 
@@ -455,9 +462,12 @@ void* reply_to_list_boxes(void* args){
         if(write(man_pipe, &reply_box, sizeof(box_t)) < 1)
             exit(EXIT_FAILURE);
         }
+        printf("+++\n");
         // Reseta o last para no segundo list não bloquear neste elemento
         boxes[n_boxes - 1].last = 0;
     }
+    n_active_threads--;
+    
     return NULL;
 }
 
@@ -470,11 +480,11 @@ void list_boxes(int register_pipe){
         printf("Too many threads!!!\n");
         return;
     }
-
+   
     int index = n_active_threads;
     n_active_threads++;
 
-    if(pthread_create(&tid[index], NULL, reply_to_list_boxes, (void*)&manager_pipe ) != 0){
+    if(pthread_create(&tid[index], NULL, reply_to_list_boxes, (void*)manager_pipe ) != 0){
         fprintf(stderr, "[ERR]: Fail to create publisher thread: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
