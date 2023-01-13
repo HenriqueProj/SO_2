@@ -51,13 +51,14 @@ int main(int argc, char **argv) {
         if(len == MESSAGE_SIZE)
             message[MESSAGE_SIZE - 1] = '\0';
         else {
-            message[strcspn(message, "\n")] = 0;;
+            message[len -1 ] = '\0';
+            fill_string(MESSAGE_SIZE, message);
         }
         // Envia mensagem pelo pipe ao server
 
         if(write(tx, &code, sizeof(uint8_t)) < 1)
             exit(EXIT_FAILURE);
-        if(write(tx, &str, sizeof(char)*MESSAGE_SIZE) < 1)
+        if(write(tx, &message, MESSAGE_SIZE) < 1)
             exit(EXIT_FAILURE);
     }
 

@@ -74,7 +74,6 @@ int find_box(char* box_name) {
 }
 
 void publisher_function(int register_pipe){
-    box_t box;
     register_request_t request;
     read_pipe(register_pipe, &request, sizeof(register_request_t));
 
@@ -84,26 +83,14 @@ void publisher_function(int register_pipe){
     if(box_handle == -1)
         return;
     
-    int ver = -1;
+    int box_index = find_box(request.box_name);
 
-    for(int i = 0; i < n_boxes; i++){
-        if( !strcmp(boxes[i].box_name, request.box_name) ){
-            box = boxes[i];
-            ver = 1;
-            break;
-        }
-    }
-
-    // Não está no array de boxes
-    if(ver == -1)
+    if(box_index == -1)
         return;
-
-    // Há um publisher na box
-    if(box.n_publishers != 0)
-        return;
+        
 
     // Success!!
-    box.n_publishers = 1;
+    boxes[box_index].n_publishers = 1;
 
     // FIM DO REGISTO
     uint8_t code;
@@ -113,7 +100,8 @@ void publisher_function(int register_pipe){
 
     while((read_pipe(pub_pipe, &code, sizeof(uint8_t))) > 0) {
         read_pipe(pub_pipe, &message, MESSAGE_SIZE);
-
+        message[strlen(message)] = '\0';
+        printf("from pipe:");
         tfs_write(box_handle, message, strlen(message)); 
 
         printf("%s", message);
@@ -133,7 +121,8 @@ void read_messages(register_request_t subscriber_request) {
 
     char buffer[MESSAGE_SIZE];
     ssize_t bytes_read = tfs_read(box_handle, buffer, MESSAGE_SIZE);
-
+    buffer[bytes_read] = '\0';
+    
     while(bytes_read != 0) {
         if(write(subscriber_pipe, &buffer, sizeof(char) * strlen(buffer)) < 1){
             exit(EXIT_FAILURE);
@@ -141,13 +130,13 @@ void read_messages(register_request_t subscriber_request) {
         printf("bytes read: %ld\n", bytes_read);
         printf("%s\n", buffer);
         bytes_read = tfs_read(box_handle, buffer, MESSAGE_SIZE);
+        buffer[bytes_read] = '\0';
     }
 
     close(box_handle);
 }
 
 void register_subscriber(int register_pipe){
-    box_t box;    
     register_request_t subscriber_request;
     ssize_t bytes_read = read_pipe(register_pipe, &subscriber_request, sizeof(register_request_t));
     
@@ -166,10 +155,10 @@ void register_subscriber(int register_pipe){
 
     int box_index = find_box(subscriber_request.box_name);
 
-    box = boxes[box_index];
+    if(box_index == -1)
+        return;
 
-    // Success!!
-    box.n_subscribers++;
+    boxes[box_index].n_subscribers++;
 
     printf("\nSUBSCRIBER REGISTED\n");
 
@@ -350,7 +339,6 @@ void reply_to_list_boxes(char* manager_pipe){
         for(i = 0; i < n_boxes; i++){
             reply_box = boxes[i];
         
-        fprintf(stdout, "%s %zu %zu %zu\n", reply_box.box_name, reply_box.box_size, reply_box.n_publishers, reply_box.n_subscribers);
 
         if(write(man_pipe, &reply_box, sizeof(box_t)) < 1)
             exit(EXIT_FAILURE);
@@ -395,16 +383,13 @@ void* main_thread_function(void* arg){
                 break;
         case 3:
                 //create box
-                printf("Entrou!\n");
                 create_box(*register_pipe);
                 break;
         case 5:
                 //box removal
-                printf("Entrou!\n");
                 remove_box(*register_pipe);
                 break;
         case 7:
-                printf("A ENVIAR:\n");
                 list_boxes(*register_pipe);
                 break;
         case 9:
