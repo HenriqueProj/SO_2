@@ -68,14 +68,11 @@ int main(int argc, char **argv) {
 
     // Só sai em caso de erro do read ou SIGINT
     // FIXME : Espera ativa?
-    int n = 1;
     while(bytes_read != -1){
 
         // Caso ainda não tenha lido tudo
         if(bytes_read > 0){
             // Imprime a mensagem e reseta o buffer
-            fprintf(stdout, "reading for the %d time\n", n);
-            n++;
             fprintf(stdout, "%s\n", message);
             memset(message, 0, MESSAGE_SIZE);
             n_messages++;
