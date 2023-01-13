@@ -17,11 +17,8 @@
 #include <utils.h>
 #include "config.h"
 
-// Maximo de boxes, equivalente ao numero maximo de inodes do tfs
-#define MAX_BOXES 64
-
 box_t boxes[MAX_BOXES];
-int n_boxes;
+size_t n_boxes;
 
 void delete_box(int i){
     char string_aux[PIPE_NAME_SIZE];
@@ -157,7 +154,7 @@ void register_subscriber(int register_pipe){
 
     inode_t *root_dir_inode = inode_get(ROOT_DIR_INUM);
 
-    int box_handle = find_in_dir(root_dir_inode, subscriber_request.box_name + 1);
+    int box_handle = find_in_dir(root_dir_inode, subscriber_request.box_name);
     
     // Box não existe
     if( box_handle == -1) {
@@ -213,7 +210,7 @@ void create_box(int register_pipe) {
         reply_to_box_creation(box_request.client_name_pipe_path, 0);
         return;
     }
-    int file_handle = find_in_dir(inode_get(ROOT_DIR_INUM), box_request.box_name + 1);
+    int file_handle = find_in_dir(inode_get(ROOT_DIR_INUM), box_request.box_name);
     
     //the box already exists
     if(file_handle != -1){
@@ -226,8 +223,12 @@ void create_box(int register_pipe) {
             return;
         }
     }
+    char box_name[BOX_NAME_SIZE];
 
-    int box_handle = tfs_open(box_request.box_name, TFS_O_CREAT);
+    box_name[0] = '/';
+    strcpy(box_name + 1, box_request.box_name);
+
+    int box_handle = tfs_open(box_name, TFS_O_CREAT);
 
     if(box_handle == -1){
         reply_to_box_creation(box_request.client_name_pipe_path, 0);
