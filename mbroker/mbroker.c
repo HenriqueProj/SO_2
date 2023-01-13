@@ -74,7 +74,11 @@ void publisher_function(int register_pipe){
     register_request_t request;
     read_pipe(register_pipe, &request, sizeof(register_request_t));
 
-    int box_handle = tfs_open(request.box_name, TFS_O_APPEND);
+    char box_name[BOX_NAME_SIZE];
+    box_name[0] = '/';
+    strcpy(box_name+1, request.box_name);
+
+    int box_handle = tfs_open(box_name, TFS_O_APPEND);
   
     // Box não existe
     if(box_handle == -1)
@@ -100,7 +104,7 @@ void publisher_function(int register_pipe){
         message[strlen(message)] = '\0';
         printf("from pipe:");
         tfs_write(box_handle, message, strlen(message)); 
-
+        tfs_write(box_handle, "\0", sizeof(char));
         printf("%s", message);
         // FIXME : 
     }
@@ -108,26 +112,36 @@ void publisher_function(int register_pipe){
 }
 
 void read_messages(register_request_t subscriber_request) {
-     
-    int box_handle = tfs_open(subscriber_request.box_name, 0);
+    char box_name[BOX_NAME_SIZE];
+    box_name[0] = '/';
+    strcpy(box_name+1, subscriber_request.box_name);
+    int box_handle = tfs_open(box_name, 0);
     int subscriber_pipe = open_pipe(subscriber_request.client_name_pipe_path, 'w');
 
     if(box_handle == -1 || subscriber_pipe == -1) {
         return;
     }
 
+    char char_buffer;
     char buffer[MESSAGE_SIZE];
-    ssize_t bytes_read = tfs_read(box_handle, buffer, MESSAGE_SIZE);
-    buffer[bytes_read] = '\0';
-    
-    while(bytes_read != 0) {
-        if(write(subscriber_pipe, &buffer, sizeof(char) * strlen(buffer)) < 1){
-            exit(EXIT_FAILURE);
+    int i = 0;
+    ssize_t bytes_read = tfs_read(box_handle, &char_buffer, sizeof(char));
+    while(bytes_read > 0) {
+        if(char_buffer == '\0') {
+            buffer[i] = '\0';
+            fill_string(MESSAGE_SIZE, buffer);
+            if(write(subscriber_pipe, &buffer, MESSAGE_SIZE) < 1){
+                exit(EXIT_FAILURE);
+            }
+            //reset buffer e indíce
+            memset(buffer, 0, MESSAGE_SIZE);
+            i = 0;
         }
-        printf("bytes read: %ld\n", bytes_read);
-        printf("%s\n", buffer);
-        bytes_read = tfs_read(box_handle, buffer, MESSAGE_SIZE);
-        buffer[bytes_read] = '\0';
+        else {
+            buffer[i] = char_buffer;
+            i++;
+        }
+        bytes_read = tfs_read(box_handle, &char_buffer, sizeof(char));
     }
 
     close(box_handle);
