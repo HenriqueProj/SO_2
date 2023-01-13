@@ -20,8 +20,8 @@
 box_t boxes[MAX_BOXES];
 size_t n_boxes;
 int n_active_threads;
-int max_sessions;
 pthread_t* tid;
+size_t max_sessions;
 
 void delete_box(int i){
     char string_aux[PIPE_NAME_SIZE];
@@ -74,28 +74,34 @@ int find_box(char* box_name) {
 }
 
 void* write_messages(void* arg){
-    char** args = (char**)arg;
 
-    char* box_name = args[0];
-    char* pipename = args[1];
+    pub_args_t* args = (pub_args_t*)arg;
+
+    char* box_name = args->box_name;
+    
+    char* pipename = args->pipename;
+    printf("%s\n", box_name);
 
     int box_handle = tfs_open(box_name, TFS_O_APPEND);
-    
+
     uint8_t code;
     char message[MESSAGE_SIZE];
 
     int pub_pipe = open_pipe(pipename, 'r');
 
+    printf("%s\n", pipename);
+
     while((read_pipe(pub_pipe, &code, sizeof(uint8_t))) > 0) {
         read_pipe(pub_pipe, &message, MESSAGE_SIZE);
         message[strlen(message)] = '\0';
-        printf("from pipe:");
+
         tfs_write(box_handle, message, strlen(message)); 
         tfs_write(box_handle, "\0", sizeof(char));
-        printf("%s", message);
+        printf("%s\n", message);
 
     }
-    close(box_handle);
+    tfs_close(box_handle);
+    close(pub_pipe);
 
     return NULL;
 }
@@ -104,7 +110,7 @@ void register_publisher(int register_pipe){
     register_request_t request;
     read_pipe(register_pipe, &request, sizeof(register_request_t));
 
-    char box_name[BOX_NAME_SIZE];
+    char box_name[BOX_NAME_SIZE + 1];
     box_name[0] = '/';
     strcpy(box_name+1, request.box_name);
 
@@ -118,7 +124,7 @@ void register_publisher(int register_pipe){
 
     if(box_index == -1)
         return;
-    
+
     // Para passar string para a função do publisher
     // Deste modo, passa um char**, em vez de ter de criar uma struct args{int, char*}
     tfs_close(box_handle);
@@ -130,13 +136,18 @@ void register_publisher(int register_pipe){
         printf("Too many threads!!!\n");
         return;
     }
+
     // Caso o numero de active threads mude durante a duração do publisher, o indice não altera
     int index = n_active_threads;
     n_active_threads++;
+    
+    pub_args_t args;
 
-    char** args;
-    args[0] = box_name;
-    args[1] = request.client_name_pipe_path;
+    strcpy(args.box_name, box_name);
+
+    strcpy(args.pipename, request.client_name_pipe_path);
+
+    printf("%d %ld\n", index, max_sessions);
 
     if(pthread_create(&tid[index], NULL, write_messages, (void*)&args ) != 0){
         fprintf(stderr, "[ERR]: Fail to create publisher thread: %s\n", strerror(errno));
@@ -146,15 +157,18 @@ void register_publisher(int register_pipe){
     pthread_join(tid[index], NULL);
 }
 
-void read_messages(register_request_t subscriber_request) {
+
+void* read_messages(void* args) {
+    register_request_t* subscriber_request = (register_request_t*)args;
+
     char box_name[BOX_NAME_SIZE];
     box_name[0] = '/';
-    strcpy(box_name+1, subscriber_request.box_name);
+    strcpy(box_name+1, subscriber_request->box_name);
     int box_handle = tfs_open(box_name, 0);
-    int subscriber_pipe = open_pipe(subscriber_request.client_name_pipe_path, 'w');
+    int subscriber_pipe = open_pipe(subscriber_request->client_name_pipe_path, 'w');
 
     if(box_handle == -1 || subscriber_pipe == -1) {
-        return;
+        return NULL;
     }
 
     char char_buffer;
@@ -179,7 +193,9 @@ void read_messages(register_request_t subscriber_request) {
         bytes_read = tfs_read(box_handle, &char_buffer, sizeof(char));
     }
 
-    close(box_handle);
+    tfs_close(box_handle);
+
+    return NULL;
 }
 
 void register_subscriber(int register_pipe){
@@ -208,8 +224,14 @@ void register_subscriber(int register_pipe){
 
     printf("\nSUBSCRIBER REGISTED\n");
 
+    int index = n_active_threads;
+    n_active_threads++;
+
     //Subscriber created sucessfully, will wait for messages to be written in message box
-    read_messages(subscriber_request);
+    if(pthread_create(&tid[index], NULL, read_messages, (void*)&subscriber_request ) != 0){
+        fprintf(stderr, "[ERR]: Fail to create subscriber thread: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
 
     return;
 }
@@ -413,7 +435,8 @@ void publisher_messages(int register_pipe){
 }
 
 void* main_thread_function(void* arg){
-    int* register_pipe = (int*) arg;
+    int* register_pipe = (int*)arg;
+
 
     uint8_t code;
 
@@ -465,9 +488,13 @@ int main(int argc, char **argv) {
     n_active_threads = 0;
 
     char* register_pipe_name = argv[1];
+    long max_s = strtol(argv[2], NULL, 0);
 
-    max_sessions = (int) argv[2];
-    tid = malloc(sizeof(pthread_t) * max_sessions);
+    printf("%ld", max_s);
+
+    max_sessions = (size_t)max_s;
+
+    tid = malloc( sizeof(pthread_t) * max_sessions);
 
     pthread_t main_thread;
 

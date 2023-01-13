@@ -11,6 +11,16 @@
 #define BOX_NAME_SIZE 32
 #define MESSAGE_SIZE 1024
 
+typedef struct {
+    int register_pipe;
+    size_t max_sessions;
+} main_thread_t;
+
+typedef struct {
+    char box_name[BOX_NAME_SIZE];
+    char pipename[PIPE_NAME_SIZE];
+} pub_args_t;
+
 typedef struct __attribute__((__packed__)){
     char box_name[BOX_NAME_SIZE];
     char publisher[PIPE_NAME_SIZE];

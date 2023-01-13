@@ -43,6 +43,8 @@ int main(int argc, char **argv) {
     if(tx == -1)
         return -1;
 
+    printf("%s\n", request.client_name_pipe_path);
+
     while(fgets(str, MESSAGE_SIZE, stdin) != NULL){
         strcpy(message, str);
   
@@ -55,7 +57,7 @@ int main(int argc, char **argv) {
             fill_string(MESSAGE_SIZE, message);
         }
         // Envia mensagem pelo pipe ao server
-
+        printf("Writing\n");
         if(write(tx, &code, sizeof(uint8_t)) < 1)
             exit(EXIT_FAILURE);
         if(write(tx, &message, MESSAGE_SIZE) < 1)
