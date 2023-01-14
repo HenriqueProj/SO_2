@@ -110,10 +110,12 @@ int pcq_destroy(pc_queue_t *queue){
 //
 // If the queue is full, sleep until the queue has space
 int pcq_enqueue(pc_queue_t *queue, void *elem){
-    if(queue->pcq_current_size == queue->pcq_capacity){
-        // Espera até receber um signal
-        // TODO: Maybe SIGALARM para reativar a função??
-        pause();
+
+    if (pthread_mutex_lock(&queue->pcq_pusher_condvar_lock) != 0)
+        exit(EXIT_FAILURE);
+
+    while(queue->pcq_current_size == queue->pcq_capacity){
+        pthread_cond_wait(&queue->pcq_pusher_condvar, &queue->pcq_pusher_condvar_lock);
     }
 
     if(queue->pcq_current_size == 0){
@@ -127,20 +129,29 @@ int pcq_enqueue(pc_queue_t *queue, void *elem){
     }
 
     queue->pcq_buffer[queue->pcq_current_size] = elem;
-
+    
     queue->pcq_current_size++;
 
-    return 1;
+    pthread_cond_signal(&queue->pcq_popper_condvar);
+
+    if (pthread_mutex_unlock(&queue->pcq_pusher_condvar_lock) != 0)
+        exit(EXIT_FAILURE);
+
+    return 0;
 }
 
 // pcq_dequeue: remove an element from the back of the queue
 //
 // If the queue is empty, sleep until the queue has an element
 void *pcq_dequeue(pc_queue_t *queue){
-    if(queue->pcq_current_size == 0){
+
+    if (pthread_mutex_lock(&queue->pcq_popper_condvar_lock) != 0)
+        exit(EXIT_FAILURE);
+
+    while(queue->pcq_current_size == 0){
         // Espera até receber um signal
         // TODO: Maybe SIGALARM para reativar a função??
-        pause();
+        pthread_cond_wait(&queue->pcq_popper_condvar, &queue->pcq_popper_condvar_lock);
     }
     if(queue->pcq_current_size == 1){
         // 1 thread ativa - esvazia pcq
@@ -161,6 +172,11 @@ void *pcq_dequeue(pc_queue_t *queue){
         queue->pcq_tail--;
         queue->pcq_current_size--;
     }
+
+    pthread_cond_signal(&queue->pcq_pusher_condvar);
+
+    if (pthread_mutex_unlock(&queue->pcq_popper_condvar_lock) != 0)
+        exit(EXIT_FAILURE);
 
     return NULL;
 }
