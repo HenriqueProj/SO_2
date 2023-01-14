@@ -46,7 +46,7 @@ vpath %.h $(INCLUDE_DIRS)
 
 CFLAGS = -std=c17 -D_POSIX_C_SOURCE=200809L
 CFLAGS += $(INCLUDES)
-LDFLAGS = -pthread
+LDFLAGS = -fsanitize=thread
 
 # Warnings
 CFLAGS += -fdiagnostics-color=always -Wall -Werror -Wextra -Wcast-align -Wconversion -Wfloat-equal -Wformat=2 -Wnull-dereference -Wshadow -Wsign-conversion -Wswitch-default -Wswitch-enum -Wundef -Wunreachable-code -Wunused

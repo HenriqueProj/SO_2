@@ -1,6 +1,4 @@
 #include "logging.h"
-#include <assert.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,6 +17,9 @@
 
 box_t boxes[MAX_BOXES];
 size_t n_boxes;
+int n_active_threads = 0;
+pthread_t* tid;
+size_t max_sessions;
 
 void delete_box(int i){
     char string_aux[PIPE_NAME_SIZE];
@@ -77,7 +78,12 @@ void add_subscriber_to_box(int box_index, char* subscriber_pipe_name) {
 }
 
 
-void recieve_messages_from_publisher(register_request_t publisher, int box_index){
+void* recieve_messages_from_publisher(void* arg){
+    pub_args_t* args = (pub_args_t*) arg;
+
+    register_request_t publisher = args->publisher;
+    int box_index = args->box_index;
+
     char box_name[BOX_NAME_SIZE];
     box_name[0] = '/';
     strcpy(box_name+1, publisher.box_name);
@@ -115,13 +121,15 @@ void recieve_messages_from_publisher(register_request_t publisher, int box_index
     boxes[box_index].n_publishers = 0;
     close(pub_pipe);  
     tfs_close(box_handle);
+
+    return NULL;
 }
 
 void publisher_function(int register_pipe){
     register_request_t request;
     read_pipe(register_pipe, &request, sizeof(register_request_t));
 
-    char box_name[BOX_NAME_SIZE];
+    char box_name[BOX_NAME_SIZE + 1];
     box_name[0] = '/';
     strcpy(box_name+1, request.box_name);
 
@@ -136,24 +144,42 @@ void publisher_function(int register_pipe){
     if(box_index == -1)
         return;
         
-
     // Success!!
     boxes[box_index].n_publishers = 1;
 
-    // FIM DO REGISTO
-    recieve_messages_from_publisher(request, box_index);
+    if(n_active_threads >= max_sessions ){
+        printf("Too many threads!!!\n");
+        return;
+    }
+
+    int index = n_active_threads;
+    n_active_threads++;
+
+    pub_args_t args;
+    args.publisher = request;
+    args.box_index = box_index;
+
+    if(pthread_create(&tid[index], NULL, recieve_messages_from_publisher, (void*)&args ) != 0){
+        fprintf(stderr, "[ERR]: Fail to create publisher thread: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    pthread_join(tid[index], NULL);
+    n_active_threads--;
 }
 
 
-void read_messages(register_request_t subscriber_request) {
-    char box_name[BOX_NAME_SIZE];
+void* read_messages(void* args) {
+    register_request_t* subscriber_request = (register_request_t*) args;
+
+    char box_name[BOX_NAME_SIZE + 1];
     box_name[0] = '/';
-    strcpy(box_name+1, subscriber_request.box_name);
+    strcpy(box_name+1, subscriber_request->box_name);
     int box_handle = tfs_open(box_name, 0);
-    int subscriber_pipe = open_pipe(subscriber_request.client_name_pipe_path, 'w');
+    int subscriber_pipe = open_pipe(subscriber_request->client_name_pipe_path, 'w');
 
     if(box_handle == -1 || subscriber_pipe == -1) {
-        return;
+        return NULL;
     }
 
     uint8_t code = 10;
@@ -186,6 +212,8 @@ void read_messages(register_request_t subscriber_request) {
 
     tfs_close(box_handle);
     close(subscriber_pipe);
+
+    return NULL;
 }
 
 void register_subscriber(int register_pipe){
@@ -215,13 +243,30 @@ void register_subscriber(int register_pipe){
     boxes[box_index].n_subscribers++;
     add_subscriber_to_box(box_index, subscriber_request.client_name_pipe_path);
     //Subscriber created sucessfully, will wait for messages to be written in message box
-    read_messages(subscriber_request);
+    
+    if(n_active_threads >= max_sessions ){
+        printf("Too many threads!!!\n");
+        return;
+    }
 
-    return;
+    int index = n_active_threads;
+    n_active_threads++;
+    
+    if(pthread_create(&tid[index], NULL, read_messages, (void*)&subscriber_request ) != 0){
+        fprintf(stderr, "[ERR]: Fail to create publisher thread: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    pthread_join(tid[index], NULL);
+    n_active_threads--;
 }
 
-void reply_to_box_creation(char* pipe_name, int n) {
-    
+void* reply_to_box_creation(void* arg) {
+    man_args_t* args = (man_args_t*) arg;
+
+    char* pipe_name = args->pipe_name;
+    int n = args->n;
+
     box_reply_t reply;
     uint8_t code = 4;
 
@@ -243,31 +288,35 @@ void reply_to_box_creation(char* pipe_name, int n) {
         exit(EXIT_FAILURE);
     }
     close(manager_pipe);
+
+    return NULL;
 }
 
 void create_box(int register_pipe) {
     box_t box;
     register_request_t box_request;
     ssize_t bytes_read = read_pipe(register_pipe, &box_request, sizeof(register_request_t));
-   
+    
+    man_args_t args;
+    args.pipe_name = box_request.client_name_pipe_path;
+    args.n = 1;
+
     if(bytes_read == -1){
-        reply_to_box_creation(box_request.client_name_pipe_path, 0);
-        return;
+        args.n = 0;
     }
     int file_handle = find_in_dir(inode_get(ROOT_DIR_INUM), box_request.box_name);
     
     //the box already exists
     if(file_handle != -1){
-        reply_to_box_creation(box_request.client_name_pipe_path, 0);
-        return;
+        args.n = 0;
     }
     for(int cont = 0; cont < n_boxes; cont++){
         if(!strcmp(boxes[cont].box_name, box_request.box_name) ){
-            reply_to_box_creation(box_request.client_name_pipe_path, 0);
-            return;
+            args.n = 0;
+            break;
         }
     }
-    char box_name[BOX_NAME_SIZE];
+    char box_name[BOX_NAME_SIZE + 1];
 
     box_name[0] = '/';
     strcpy(box_name + 1, box_request.box_name);
@@ -275,28 +324,49 @@ void create_box(int register_pipe) {
     int box_handle = tfs_open(box_name, TFS_O_CREAT);
 
     if(box_handle == -1){
-        reply_to_box_creation(box_request.client_name_pipe_path, 0);
-        return;
+        args.n = 0;
     }
-    box.box_size = 0;
-    box.n_publishers = 0;
-    box.n_subscribers = 0;
-    strcpy(box.box_name, box_request.box_name);
-    
+
+    if(args.n == 1){
+        box.box_size = 0;
+        box.n_publishers = 0;
+        box.n_subscribers = 0;
+        strcpy(box.box_name, box_request.box_name);
+    }
+
     if (pthread_cond_init(&box.condition, NULL) != 0)
         return;
 
     tfs_close(box_handle);
-    reply_to_box_creation(box_request.client_name_pipe_path, 1);
+
+    if(n_active_threads >= max_sessions ){
+        printf("Too many threads!!!\n");
+        return;
+    }
+    int index = n_active_threads;
+    n_active_threads++;
+
+    if(pthread_create(&tid[index], NULL, reply_to_box_creation, (void*)&args ) != 0){
+        fprintf(stderr, "[ERR]: Fail to create manager thread: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }   
+
+    pthread_join(tid[index], NULL);
+    n_active_threads--;
 
     //adicionar box a um array de boxes global
-    add_box(box);
-
+    if(args.n == 1)
+        add_box(box);
 }
 
-void reply_to_box_removal(char* pipe_name, int n) {
+void* reply_to_box_removal(void* arg) {
+    man_args_t* args = (man_args_t*) arg;
+
+    char* pipe_name = args->pipe_name;
+    int n = args->n;
+
     box_reply_t reply;
-    
+
     uint8_t code = 6;
     reply.return_code = 0;
 
@@ -318,6 +388,8 @@ void reply_to_box_removal(char* pipe_name, int n) {
         printf("Writing error\n");
         exit(EXIT_FAILURE);
     }
+    
+    return NULL;
 }
 
 void remove_box(int register_pipe) {
@@ -326,9 +398,12 @@ void remove_box(int register_pipe) {
     box_name[0] = '/';
     ssize_t bytes_read = read_pipe(register_pipe, &box_request, sizeof(register_request_t));
 
+    man_args_t args;
+    args.n = 1;
+    args.pipe_name = box_request.client_name_pipe_path;
+
     if(bytes_read == -1){
-        reply_to_box_removal(box_request.client_name_pipe_path, 0);
-        return;
+        args.n = 0;
     }
     strcpy(box_name+1, box_request.box_name);
     //the box doesn't exist
@@ -340,8 +415,7 @@ void remove_box(int register_pipe) {
     int box_handle = tfs_unlink(box_name);
 
     if(box_handle == -1){
-        reply_to_box_removal(box_request.client_name_pipe_path, 0);
-        return;
+        args.n = 0;
     }
 
     //verifica se está no array global
@@ -356,22 +430,36 @@ void remove_box(int register_pipe) {
     }
     // Box não está no array global
     if(ver == -1){
-        reply_to_box_removal(box_request.client_name_pipe_path, 0);
-        return;
+        args.n = 0;
     }
 
     //free box from array
-    delete_box(ver);
+    if(args.n == 1)
+        delete_box(ver);
 
-    reply_to_box_removal(box_request.client_name_pipe_path, 1);
+    if(n_active_threads >= max_sessions ){
+        printf("Too many threads!!!\n");
+        return;
+    }
+    int index = n_active_threads;
+    n_active_threads++;
 
+    if(pthread_create(&tid[index], NULL, reply_to_box_removal, (void*)&args ) != 0){
+        fprintf(stderr, "[ERR]: Fail to create manager thread: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }   
+
+    pthread_join(tid[index], NULL);
+    n_active_threads--;
 }
 
-void reply_to_list_boxes(char* manager_pipe){
+void* reply_to_list_boxes(void* args){
+    char** manager_pipe = (char**) args;
+
     uint8_t code = 8;
     box_t reply_box;
 
-    int man_pipe = open_pipe(manager_pipe, 'w');
+    int man_pipe = open_pipe(*manager_pipe, 'w');
 
     int i = 0;
 
@@ -405,6 +493,7 @@ void reply_to_list_boxes(char* manager_pipe){
         // Reseta o last para no segundo list não bloquear neste elemento
         boxes[n_boxes - 1].last = 0;
     }
+    return NULL;
 }
 
 void list_boxes(int register_pipe){
@@ -412,7 +501,20 @@ void list_boxes(int register_pipe){
 
     read_pipe(register_pipe, &manager_pipe, PIPE_NAME_SIZE);
     
-    reply_to_list_boxes(manager_pipe);
+    if(n_active_threads >= max_sessions ){
+        printf("Too many threads!!!\n");
+        return;
+    }
+    int index = n_active_threads;
+    n_active_threads++;
+
+    if(pthread_create(&tid[index], NULL, reply_to_list_boxes, (void*)&manager_pipe ) != 0){
+        fprintf(stderr, "[ERR]: Fail to create manager thread: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }   
+
+    pthread_join(tid[index], NULL);
+    n_active_threads--;
 }
 
 
@@ -468,8 +570,14 @@ int main(int argc, char **argv) {
     n_boxes = 0;
 
     char* register_pipe_name = argv[1];
-    //int max_sessions = (int) argv[2];
-    //pthread_t tid[max_sessions];
+    
+    long max_s = strtol(argv[2], NULL, 0);
+
+    printf("%ld", max_s);
+
+    max_sessions = (size_t)max_s;
+
+    tid = malloc( sizeof(pthread_t) * max_sessions);
 
     pthread_t main_thread;
 
@@ -485,7 +593,7 @@ int main(int argc, char **argv) {
     }
 
     pthread_join(main_thread, NULL);
-
+    
     fprintf(stderr, "usage: mbroker <pipename>\n");
     return 0;
 }

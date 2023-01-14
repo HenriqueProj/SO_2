@@ -55,6 +55,16 @@ typedef struct __attribute__((__packed__)){
     char string[MESSAGE_SIZE];
 } message_exchange_t;
 
+typedef struct {
+    register_request_t publisher;
+    int box_index;
+} pub_args_t;
+
+typedef struct {
+    char* pipe_name;
+    int n;
+} man_args_t;
+
 int create_pipe(char* pipename);
 int open_pipe(char* pipename, char mode);
 /*void write_pipe(int tx, char const *str);*/
