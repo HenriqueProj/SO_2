@@ -336,7 +336,7 @@ man_args_t create_box(int register_pipe) {
     }
 
     if (pthread_cond_init(&box.condition, NULL) != 0)
-        return;
+        exit(EXIT_FAILURE);
 
     tfs_close(box_handle);
 
@@ -425,7 +425,7 @@ man_args_t remove_box(int register_pipe) {
     if(args.n == 1)
         delete_box(ver);
 
-    return args
+    return args;
 }
 
 void* reply_to_list_boxes(void* args){
@@ -511,12 +511,12 @@ void* main_thread_function(void* arg){
                 break;
         case 3:
                 //create box
-                man_args_t args = create_box(*register_pipe);
+                man_args_t args1 = create_box(*register_pipe);
                 
                 index = n_active_threads;
                 pcq_enqueue(queue, &tid[index]);
 
-                if(pthread_create(&tid[index], NULL, reply_to_box_removal, (void*)&args ) != 0){
+                if(pthread_create(&tid[index], NULL, reply_to_box_removal, (void*)&args1 ) != 0){
                     fprintf(stderr, "[ERR]: Fail to create list boxes thread: %s\n", strerror(errno));
                     exit(EXIT_FAILURE);
                 } 
@@ -526,12 +526,12 @@ void* main_thread_function(void* arg){
                 break;
         case 5:
                 //box removal
-                man_args_t args = remove_box(*register_pipe);
+                man_args_t args2 = remove_box(*register_pipe);
 
                 index = n_active_threads;
                 pcq_enqueue(queue, &tid[index]);
 
-                if(pthread_create(&tid[index], NULL, reply_to_box_removal, (void*)&args ) != 0){
+                if(pthread_create(&tid[index], NULL, reply_to_box_removal, (void*)&args2 ) != 0){
                     fprintf(stderr, "[ERR]: Fail to create list boxes thread: %s\n", strerror(errno));
                     exit(EXIT_FAILURE);
                 } 
