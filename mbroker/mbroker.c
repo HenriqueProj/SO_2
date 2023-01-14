@@ -1,6 +1,4 @@
 #include "logging.h"
-#include <assert.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -234,7 +232,7 @@ void register_subscriber(int register_pipe){
         fprintf(stderr, "[ERR]: Fail to create subscriber thread: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
-
+    pthread_join(tid[index], NULL);
     return;
 }
 
@@ -326,6 +324,7 @@ void create_box(int register_pipe) {
         fprintf(stderr, "[ERR]: Fail to create publisher thread: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
+    pthread_join(tid[index], NULL);
 
     //adicionar box a um array de boxes global
     add_box(box);
@@ -422,7 +421,7 @@ void remove_box(int register_pipe) {
         fprintf(stderr, "[ERR]: Fail to create publisher thread: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
-
+    pthread_join(tid[index], NULL);
 }
 
 void* reply_to_list_boxes(void* args){
@@ -488,6 +487,7 @@ void list_boxes(int register_pipe){
         fprintf(stderr, "[ERR]: Fail to create publisher thread: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
+    pthread_join(tid[index], NULL);
 }
 
 void publisher_messages(int register_pipe){
