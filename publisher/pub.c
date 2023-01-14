@@ -5,9 +5,28 @@
 #include <string.h>
 #include <fcntl.h> // for open
 #include <unistd.h> // for close
+#include <signal.h>
+
+int tx;
+
+static void sig_handler(int sig) {
+
+  if (sig == SIGPIPE) {
+   
+    //
+    if (signal(SIGPIPE, sig_handler) == SIG_ERR) {
+      exit(EXIT_FAILURE);
+    }
+    close(tx);
+  }
+
+  exit(EXIT_SUCCESS);
+}
 
 int main(int argc, char **argv) {
-
+    if (signal(SIGPIPE, sig_handler) == SIG_ERR) {
+        exit(EXIT_FAILURE);
+    }
     //não tem argumentos suficientes
     if(argc < 4)
         return -1;
@@ -48,7 +67,7 @@ int main(int argc, char **argv) {
     char message[MESSAGE_SIZE];
 
     //abre-se o pipe do publisher para escrita
-    int tx = open_pipe(request.client_name_pipe_path, 'w');
+    tx = open_pipe(request.client_name_pipe_path, 'w');
 
     if(tx == -1)
         return -1;

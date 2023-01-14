@@ -79,7 +79,7 @@ void add_subscriber_to_box(int box_index, char* subscriber_pipe_name) {
 }
 
 
-void recieve_messages_from_publisher(register_request_t publisher, int box_index){
+void recieve_messages_from_publisher(register_request_t publisher, int box_index, int ver){
 
     char box_name[BOX_NAME_SIZE + 1];
     box_name[0] = '/';
@@ -93,6 +93,11 @@ void recieve_messages_from_publisher(register_request_t publisher, int box_index
     char buffer[MESSAGE_SIZE];
 
     int pub_pipe = open_pipe(publisher.client_name_pipe_path, 'r');
+
+    if(ver == 0){
+        close(pub_pipe);
+        return;
+    }
 
     ssize_t bytes_read = read_pipe(pub_pipe, &code, sizeof(uint8_t));
     while(bytes_read > 0 && code == 9) {
@@ -131,36 +136,37 @@ void* publisher_function(void* args){
     strcpy(box_name+1, request.box_name);
 
     int box_handle = tfs_open(box_name, TFS_O_APPEND);
-  
-    // Box não existe
-    if(box_handle == -1)
-        return NULL;
-    
+
     int box_index = find_box(request.box_name);
 
-    if(box_index == -1)
+    if(box_index == -1 || box_handle == -1){
+        recieve_messages_from_publisher(request, box_index, 0);
         return NULL;
-        
+    }
     // Success!!
     boxes[box_index].n_publishers = 1;
 
-    recieve_messages_from_publisher(request, box_index);
+    recieve_messages_from_publisher(request, box_index, 1);
     return NULL;
 }
 
 
-void read_messages(register_request_t subscriber_request) {
+void read_messages(register_request_t subscriber_request, int num) {
     
     char box_name[BOX_NAME_SIZE + 1];
     box_name[0] = '/';
     strcpy(box_name+1, subscriber_request.box_name);
     int box_handle = tfs_open(box_name, 0);
+
     int subscriber_pipe = open_pipe(subscriber_request.client_name_pipe_path, 'w');
 
+    if(num == 0)
+        close(subscriber_pipe);
+    
     if(box_handle == -1 || subscriber_pipe == -1) {
         return;
     }
-
+    
     uint8_t code = 10;
     char char_buffer;
     char buffer[MESSAGE_SIZE];
@@ -202,28 +208,30 @@ void* register_subscriber(void* args){
     
 
     if(bytes_read == -1){
+        read_messages(subscriber_request, 0);
         return NULL;
     }
 
-    inode_t *root_dir_inode = inode_get(ROOT_DIR_INUM);
-
-    int box_handle = find_in_dir(root_dir_inode, subscriber_request.box_name);
+    int box_handle = find_box(subscriber_request.box_name);
     
     // Box não existe
-    if(box_handle == -1) {
+    if(box_handle < 0){
+        read_messages(subscriber_request, 0);
         return NULL;
     }
 
     int box_index = find_box(subscriber_request.box_name);
 
-    if(box_index == -1)
+    if(box_index == -1){
+        read_messages(subscriber_request, 0);
         return NULL;
+    }
 
     boxes[box_index].n_subscribers++;
     add_subscriber_to_box(box_index, subscriber_request.client_name_pipe_path);
     //Subscriber created sucessfully, will wait for messages to be written in message box
 
-    read_messages(subscriber_request);
+    read_messages(subscriber_request, 1);
 
     return NULL;
 }
