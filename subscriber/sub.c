@@ -80,11 +80,11 @@ int main(int argc, char **argv) {
 
     // Só sai em caso de erro do read ou SIGINT
     //Ou seja mandado uma mensagem com código errado
-    while(bytes_read != -1 && code == 10){
+    while(bytes_read != -1){
         //lê a mensagem
         read_pipe(tx, &message, MESSAGE_SIZE);
         
-        if(bytes_read > 0){
+        if(bytes_read > 0 && code == 10){
             // Imprime a mensagem e reseta o buffer
             fprintf(stdout, "%s\n", message);
             memset(message, 0, MESSAGE_SIZE);
@@ -93,13 +93,13 @@ int main(int argc, char **argv) {
 
         // Checka o SIGINT
         if (signal(SIGINT, sig_handler) == SIG_ERR) 
-            return -1;
-
+            return -1;  
         bytes_read = read_pipe(tx, &code, sizeof(uint8_t));
     }
 
     
     // Saiu do loop por erro
-    fprintf(stderr, "[ERR]: read failed: %s\n", strerror(errno));
+    fprintf(stderr, "[ERR]: READ FAILED: %s\n", strerror(errno));
+    printf("%ld %d\n%s\n", bytes_read, code, message);
     return 0;
 }

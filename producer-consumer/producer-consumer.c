@@ -149,8 +149,6 @@ void *pcq_dequeue(pc_queue_t *queue){
         exit(EXIT_FAILURE);
 
     while(queue->pcq_current_size == 0){
-        // Espera até receber um signal
-        // TODO: Maybe SIGALARM para reativar a função??
         pthread_cond_wait(&queue->pcq_popper_condvar, &queue->pcq_popper_condvar_lock);
     }
     if(queue->pcq_current_size == 1){

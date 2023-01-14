@@ -24,7 +24,7 @@ typedef struct {
     int subscriber_index;
     uint8_t last;
     pthread_cond_t condition;
-
+    pthread_mutex_t mutex;
 } box_t;
 
 typedef struct __attribute__((__packed__)) {

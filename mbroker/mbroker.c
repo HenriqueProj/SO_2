@@ -453,71 +453,70 @@ void* main_thread_function(void* arg){
     ssize_t bytes_read; //= read_pipe(register_pipe, &code, sizeof(uint8_t));
    
     while((bytes_read = read_pipe(*register_pipe, &code, sizeof(uint8_t))) != -1) {
-        int index;
         //if(bytes_read > 0){
         //}
         switch(code) {
         case 1:
                 //register publisher
-                index = n_active_threads;
-                pcq_enqueue(queue, &tid[index]);
+                int index1 = n_active_threads;
+                pcq_enqueue(queue, &tid[index1]);
 
-                if(pthread_create(&tid[index], NULL, publisher_function, (void*)register_pipe ) != 0){
+                if(pthread_create(&tid[index1], NULL, publisher_function, (void*)register_pipe ) != 0){
                     fprintf(stderr, "[ERR]: Fail to create list boxes thread: %s\n", strerror(errno));
                     exit(EXIT_FAILURE);
                 }
-                pthread_join(tid[index], NULL);
+                ////pthread_join(tid[index1], NULL);
 
                 pcq_dequeue(queue);
                 break;
         case 2:
                 //register subscriber
-                index = n_active_threads;
-                pcq_enqueue(queue, &tid[index]);
+                int index2 = n_active_threads;
+                pcq_enqueue(queue, &tid[index2]);
 
-                if(pthread_create(&tid[index], NULL, register_subscriber, (void*)register_pipe ) != 0){
+                if(pthread_create(&tid[index2], NULL, register_subscriber, (void*)register_pipe ) != 0){
                     fprintf(stderr, "[ERR]: Fail to create list boxes thread: %s\n", strerror(errno));
                     exit(EXIT_FAILURE);
                 }
-                pthread_join(tid[index], NULL);
+                //pthread_join(tid[index2], NULL);
 
                 pcq_dequeue(queue);
                 break;
         case 3:
                 //create box
-                index = n_active_threads;
-                pcq_enqueue(queue, &tid[index]);
+                int index3 = n_active_threads;
+                pcq_enqueue(queue, &tid[index3]);
 
-                if(pthread_create(&tid[index], NULL, create_box, (void*)register_pipe ) != 0){
+                if(pthread_create(&tid[index3], NULL, create_box, (void*)register_pipe ) != 0){
                     fprintf(stderr, "[ERR]: Fail to create list boxes thread: %s\n", strerror(errno));
                     exit(EXIT_FAILURE);
                 }
-                pthread_join(tid[index], NULL);
+                //pthread_join(tid[index3], NULL);
 
                 pcq_dequeue(queue);
                 break;
         case 5:
                 //box removal
-                index = n_active_threads;
-                pcq_enqueue(queue, &tid[index]);
+                int index5 = n_active_threads;
+                pcq_enqueue(queue, &tid[index5]);
 
-                if(pthread_create(&tid[index], NULL, remove_box, (void*)register_pipe ) != 0){
+                if(pthread_create(&tid[index5], NULL, remove_box, (void*)register_pipe ) != 0){
                     fprintf(stderr, "[ERR]: Fail to create list boxes thread: %s\n", strerror(errno));
                     exit(EXIT_FAILURE);
                 }
-                pthread_join(tid[index], NULL);
+                //pthread_join(tid[index5], NULL);
 
                 pcq_dequeue(queue);
                 break;
         case 7:
-                index = n_active_threads;
-                pcq_enqueue(queue, &tid[index]);
+                int index7 = n_active_threads;
+                pcq_enqueue(queue, &tid[index7]);
 
-                if(pthread_create(&tid[index], NULL, list_boxes, (void*)register_pipe ) != 0){
+                if(pthread_create(&tid[index7], NULL, list_boxes, (void*)register_pipe ) != 0){
                     fprintf(stderr, "[ERR]: Fail to create list boxes thread: %s\n", strerror(errno));
                     exit(EXIT_FAILURE);
                 }
-                pthread_join(tid[index], NULL);
+                //pthread_join(tid[index7], NULL);
 
                 pcq_dequeue(queue);
                 break;
