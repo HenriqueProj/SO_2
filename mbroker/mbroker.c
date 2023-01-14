@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <pthread.h>
 
+#include <producer-consumer.h>
 #include <operations.h>
 #include <state.h>
 #include <utils.h>
@@ -292,7 +293,7 @@ void* reply_to_box_creation(void* arg) {
     return NULL;
 }
 
-void create_box(int register_pipe) {
+man_args_t create_box(int register_pipe) {
     box_t box;
     register_request_t box_request;
     ssize_t bytes_read = read_pipe(register_pipe, &box_request, sizeof(register_request_t));
@@ -339,24 +340,11 @@ void create_box(int register_pipe) {
 
     tfs_close(box_handle);
 
-    if(n_active_threads >= max_sessions ){
-        printf("Too many threads!!!\n");
-        return;
-    }
-    int index = n_active_threads;
-    n_active_threads++;
-
-    if(pthread_create(&tid[index], NULL, reply_to_box_creation, (void*)&args ) != 0){
-        fprintf(stderr, "[ERR]: Fail to create manager thread: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }   
-
-    pthread_join(tid[index], NULL);
-    n_active_threads--;
-
     //adicionar box a um array de boxes global
     if(args.n == 1)
         add_box(box);
+
+    return args;
 }
 
 void* reply_to_box_removal(void* arg) {
@@ -392,7 +380,7 @@ void* reply_to_box_removal(void* arg) {
     return NULL;
 }
 
-void remove_box(int register_pipe) {
+man_args_t remove_box(int register_pipe) {
     register_request_t box_request;
     char box_name[BOX_NAME_SIZE];
     box_name[0] = '/';
@@ -437,20 +425,7 @@ void remove_box(int register_pipe) {
     if(args.n == 1)
         delete_box(ver);
 
-    if(n_active_threads >= max_sessions ){
-        printf("Too many threads!!!\n");
-        return;
-    }
-    int index = n_active_threads;
-    n_active_threads++;
-
-    if(pthread_create(&tid[index], NULL, reply_to_box_removal, (void*)&args ) != 0){
-        fprintf(stderr, "[ERR]: Fail to create manager thread: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }   
-
-    pthread_join(tid[index], NULL);
-    n_active_threads--;
+    return args
 }
 
 void* reply_to_list_boxes(void* args){
@@ -496,29 +471,24 @@ void* reply_to_list_boxes(void* args){
     return NULL;
 }
 
-void list_boxes(int register_pipe){
+char* list_boxes(int register_pipe){
     char manager_pipe[PIPE_NAME_SIZE];
 
     read_pipe(register_pipe, &manager_pipe, PIPE_NAME_SIZE);
-    
-    if(n_active_threads >= max_sessions ){
-        printf("Too many threads!!!\n");
-        return;
-    }
-    int index = n_active_threads;
-    n_active_threads++;
 
-    if(pthread_create(&tid[index], NULL, reply_to_list_boxes, (void*)&manager_pipe ) != 0){
-        fprintf(stderr, "[ERR]: Fail to create manager thread: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }   
+    char* man = malloc(sizeof(char) * PIPE_NAME_SIZE);
+    strcpy(man, manager_pipe);
 
-    pthread_join(tid[index], NULL);
-    n_active_threads--;
+    return man;
 }
 
 
 void* main_thread_function(void* arg){
+    pc_queue_t *queue;
+
+    queue = (pc_queue_t*)malloc(sizeof(pc_queue_t) );
+    pcq_create(queue, max_sessions);
+
     int* register_pipe = (int*) arg;
 
     uint8_t code;
@@ -526,12 +496,14 @@ void* main_thread_function(void* arg){
     ssize_t bytes_read; //= read_pipe(register_pipe, &code, sizeof(uint8_t));
    
     while((bytes_read = read_pipe(*register_pipe, &code, sizeof(uint8_t))) != -1) {
+        int index;
         //if(bytes_read > 0){
         //}
         switch(code) {
         case 1:
                 //register publisher
                 publisher_function(*register_pipe);
+
                 break;
         case 2:
                 //register subscriber
@@ -539,22 +511,48 @@ void* main_thread_function(void* arg){
                 break;
         case 3:
                 //create box
-                create_box(*register_pipe);
+                man_args_t args = create_box(*register_pipe);
+                
+                index = n_active_threads;
+                pcq_enqueue(queue, &tid[index]);
+
+                if(pthread_create(&tid[index], NULL, reply_to_box_removal, (void*)&args ) != 0){
+                    fprintf(stderr, "[ERR]: Fail to create list boxes thread: %s\n", strerror(errno));
+                    exit(EXIT_FAILURE);
+                } 
+                pthread_join(tid[index], NULL);
+
+                pcq_dequeue(queue);
                 break;
         case 5:
                 //box removal
-                remove_box(*register_pipe);
+                man_args_t args = remove_box(*register_pipe);
+
+                index = n_active_threads;
+                pcq_enqueue(queue, &tid[index]);
+
+                if(pthread_create(&tid[index], NULL, reply_to_box_removal, (void*)&args ) != 0){
+                    fprintf(stderr, "[ERR]: Fail to create list boxes thread: %s\n", strerror(errno));
+                    exit(EXIT_FAILURE);
+                } 
+                pthread_join(tid[index], NULL);
+
+                pcq_dequeue(queue);
                 break;
         case 7:
-                list_boxes(*register_pipe);
+                char* manager_pipe = list_boxes(*register_pipe);
+
+                index = n_active_threads;
+                pcq_enqueue(queue, &tid[index]);
+
+                if(pthread_create(&tid[index], NULL, reply_to_list_boxes, (void*)&manager_pipe ) != 0){
+                    fprintf(stderr, "[ERR]: Fail to create list boxes thread: %s\n", strerror(errno));
+                    exit(EXIT_FAILURE);
+                } 
+                pthread_join(tid[index], NULL);
+
+                pcq_dequeue(queue);
                 break; 
-        //are case 9 and 10 needed??
-        case 9:
-                //messages sent from publisher to server
-                break;
-        case 10:
-                //messages sent from server to subscriber
-                break;
         default:
                 break;
         }
@@ -593,7 +591,7 @@ int main(int argc, char **argv) {
     }
 
     pthread_join(main_thread, NULL);
-    
+
     fprintf(stderr, "usage: mbroker <pipename>\n");
     return 0;
 }
