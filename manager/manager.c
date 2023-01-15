@@ -114,7 +114,7 @@ int main(int argc, char **argv) {
 
         // fecha o seu named pipe porque já recebeu a resposta
         close(tx);
-
+        unlink(pipe_name);
         // em caso de erro
         if (box_reply.return_code == -1) {
             fprintf(stdout, "ERROR: %s\n", box_reply.error_message);
@@ -148,6 +148,7 @@ int main(int argc, char **argv) {
 
         // fecha-se o pipe porque já se leram todas as caixas
         close(tx);
+        unlink(pipe_name);
 
         // caso haja mais que uma caixa para listar, ordenam-se as caixas por
         // ordem alfabética

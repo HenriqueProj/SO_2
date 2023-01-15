@@ -19,19 +19,34 @@
 box_t boxes[MAX_BOXES];
 size_t n_boxes;
 int n_active_threads = 0;
-pthread_t *tid;
 size_t max_sessions;
-pc_queue_t *queue;;
 
+pthread_t *tid;
+pthread_t main_thread;
+pc_queue_t *queue;
+
+char* register_pipe_name;
 // Liberta a memória antes de fechar o mbroker
 void mbroker_close(){
     pcq_destroy(queue);
+    printf("%ld\n", n_boxes);
+    for(int i = 0; i < n_boxes; i++){
+        for(int j = 0; j < boxes[i].n_subscribers; i++){
+            printf("%s\n", boxes[i].subscribers[j]);
+            int tx = open_pipe(boxes[i].subscribers[j], 'w');
+            close(tx);
+        }
+    }
 
     for(int i = 0; i < max_sessions; i++)
         free(&tid[i]);
-
+    
     free(queue);
 
+    //FIXME: Não é suposto??
+    pthread_kill(main_thread, SIGINT);
+
+    unlink(register_pipe_name);
     printf("That's all folks!\n");
 }
 
@@ -58,7 +73,6 @@ void delete_box(int i) {
         printf("\n\n%s\n\n", publisher_pipe);
         int tx = open_pipe(publisher_pipe, 'r');
         close(tx);
-        
     }
     strcpy(string_aux, boxes[i].box_name);
     strcpy(boxes[i].box_name, boxes[n_boxes - 1].box_name);
@@ -589,7 +603,7 @@ int main(int argc, char **argv) {
     tfs_init(NULL);
     n_boxes = 0;
 
-    char *register_pipe_name = argv[1];
+    register_pipe_name = argv[1];
 
     long max_s = strtol(argv[2], NULL, 0);
 
@@ -599,8 +613,6 @@ int main(int argc, char **argv) {
 
     queue = (pc_queue_t *)malloc(sizeof(pc_queue_t));
     pcq_create(queue, max_sessions);
-    
-    pthread_t main_thread;
 
     // Cria register_pipe
     if (!create_pipe(register_pipe_name))
