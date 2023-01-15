@@ -1,10 +1,10 @@
 #ifndef __UTILS_UTILS_H__
 #define __UTILS_UTILS_H__
 
+#include <pthread.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
-#include <pthread.h>
 
 // Maximo de boxes, equivalente ao numero maximo de inodes do tfs
 #define MAX_BOXES 64
@@ -12,8 +12,8 @@
 #define BOX_NAME_SIZE 32
 #define MESSAGE_SIZE 1024
 
-//tive de tirar o attribute packed por causa da variável de condição
-typedef struct __attribute__((__packed__)){
+// tive de tirar o attribute packed por causa da variável de condição
+typedef struct __attribute__((__packed__)) {
     char box_name[BOX_NAME_SIZE];
     char publisher[PIPE_NAME_SIZE];
 
@@ -27,19 +27,18 @@ typedef struct __attribute__((__packed__)){
     pthread_mutex_t mutex;
 } box_t;
 
-
 // Structs para envio de pedidos por pipes
 
 // Registo de publishers e subscribers
 // Ou criação / remoção de caixas
-typedef struct __attribute__((__packed__)){
-    //the code of the request is sent before
+typedef struct __attribute__((__packed__)) {
+    // the code of the request is sent before
     char client_name_pipe_path[PIPE_NAME_SIZE];
     char box_name[BOX_NAME_SIZE];
 } register_request_t;
 
 // Resposta ao pedido de criação/remoção de caixa
-typedef struct __attribute__((__packed__)){
+typedef struct __attribute__((__packed__)) {
     int32_t return_code;
     char error_message[MESSAGE_SIZE];
 } box_reply_t;
@@ -50,7 +49,7 @@ typedef struct {
 } pub_args_t;
 
 typedef struct {
-    char* pipe_name;
+    char *pipe_name;
     int n;
 } man_args_t;
 
@@ -58,11 +57,11 @@ typedef struct {
     char client_name_pipe_path[PIPE_NAME_SIZE];
     char box_name[BOX_NAME_SIZE];
 } thread_args;
-int create_pipe(char* pipename);
-int open_pipe(char* pipename, char mode);
+int create_pipe(char *pipename);
+int open_pipe(char *pipename, char mode);
 /*void write_pipe(int tx, char const *str);*/
-void fill_string(size_t size, char* array);
-ssize_t read_pipe(int rx, void* buffer, size_t size);
-int compare_structs(const void* a, const void* b);
+void fill_string(size_t size, char *array);
+ssize_t read_pipe(int rx, void *buffer, size_t size);
+int compare_structs(const void *a, const void *b);
 
 #endif

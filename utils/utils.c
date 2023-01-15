@@ -1,19 +1,19 @@
 #include "logging.h"
 #include <assert.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <errno.h>
-#include <fcntl.h>
 #include <unistd.h>
 #include <utils.h>
 
-int create_pipe(char* pipename){
+int create_pipe(char *pipename) {
     // Remove pipe if it does not exist
-    char* src;
+    char *src;
     src = malloc(sizeof(char) * (PIPE_NAME_SIZE + 5));
     strcpy(src, "/tmp/");
     strcat(src, pipename);
@@ -32,13 +32,13 @@ int create_pipe(char* pipename){
     return 1;
 }
 
-int open_pipe(char* pipename, char mode){
+int open_pipe(char *pipename, char mode) {
     int tx;
-    char* src;
+    char *src;
     src = malloc(sizeof(char) * (PIPE_NAME_SIZE + 5));
     strcpy(src, "/tmp/");
     strcat(src, pipename);
-    if(mode == 'w') 
+    if (mode == 'w')
         tx = open(src, O_WRONLY);
     else
         tx = open(src, O_RDONLY);
@@ -66,17 +66,17 @@ void write_pipe(int tx, char const *str) {
     }
 }
 */
-void fill_string(size_t size, char* array){
+void fill_string(size_t size, char *array) {
     size_t len = strlen(array);
-    
+
     memset(array + len, '\0', size - len);
 }
 
 // Lê do pipe e verifica o return value
-ssize_t read_pipe(int rx, void* buffer, size_t size){
+ssize_t read_pipe(int rx, void *buffer, size_t size) {
 
     ssize_t ret = read(rx, buffer, size);
-    
+
     if (ret == -1) {
         fprintf(stderr, "[ERR]: read failed: %s\n", strerror(errno));
         return -1;
@@ -84,9 +84,9 @@ ssize_t read_pipe(int rx, void* buffer, size_t size){
     return ret;
 }
 
-int compare_structs(const void* a, const void* b) {
+int compare_structs(const void *a, const void *b) {
     char const *l = ((box_t *)a)->box_name;
     char const *r = ((box_t *)b)->box_name;
 
-    return strcmp(l , r);
+    return strcmp(l, r);
 }
