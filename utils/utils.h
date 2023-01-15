@@ -16,7 +16,7 @@
 
 // Estrutura correspondente a uma caixa
 typedef struct __attribute__((__packed__)) {
-    //Nome da caixa
+    // Nome da caixa
     char box_name[BOX_NAME_SIZE];
     // Nome do publisher associado
     char publisher[PIPE_NAME_SIZE];
@@ -29,7 +29,7 @@ typedef struct __attribute__((__packed__)) {
     // Array dos subscribers
     char subscribers[MAX_BOXES][PIPE_NAME_SIZE];
     int subscriber_index;
-    
+
     // Para a listagem das caixas
     uint8_t last;
 } box_t;
@@ -62,8 +62,8 @@ typedef struct {
 int create_pipe(char *pipename);
 
 /*
-    Abre um pipe para leitura ou escrita, consoante o caracter mode ('r' ou 'w'),
-    verificando se os return values estão todos como esperado.
+    Abre um pipe para leitura ou escrita, consoante o caracter mode ('r' ou
+   'w'), verificando se os return values estão todos como esperado.
 */
 int open_pipe(char *pipename, char mode);
 

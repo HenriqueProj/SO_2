@@ -8,7 +8,7 @@
 #include <utils.h>
 
 int tx;
-char* pub_pipename;
+char *pub_pipename;
 
 static void sig_handler(int sig) {
 

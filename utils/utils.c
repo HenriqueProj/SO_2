@@ -15,7 +15,7 @@
 #define TMP_SIZE 5
 
 int create_pipe(char *pipename) {
-    //"/tmp/" adicionado ao nome do pipe, para que a criação de pipes 
+    //"/tmp/" adicionado ao nome do pipe, para que a criação de pipes
     // funcione na plataforma sigma.
 
     char *src;
@@ -44,7 +44,7 @@ int create_pipe(char *pipename) {
 }
 
 int open_pipe(char *pipename, char mode) {
-    //"/tmp/" adicionado ao nome do pipe, para que a criação de pipes 
+    //"/tmp/" adicionado ao nome do pipe, para que a criação de pipes
     // funcione na plataforma sigma.
 
     int tx;
@@ -60,11 +60,11 @@ int open_pipe(char *pipename, char mode) {
     // Modo de escrita
     if (mode == 'w')
         tx = open(src, O_WRONLY);
-    
+
     // Modo de leitura
     else
         tx = open(src, O_RDONLY);
-    
+
     // Erro na abertura do pipe
     if (tx == -1) {
         fprintf(stderr, "[ERR]: open failed: %s\n", strerror(errno));

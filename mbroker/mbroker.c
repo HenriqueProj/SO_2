@@ -27,25 +27,25 @@ pthread_t *tid;
 pthread_t main_thread;
 pc_queue_t *queue;
 
-char* register_pipe_name;
+char *register_pipe_name;
 // Liberta a memória antes de fechar o mbroker
-void mbroker_close(){
+void mbroker_close() {
     pcq_destroy(queue);
     printf("%ld\n", n_boxes);
-    for(int i = 0; i < n_boxes; i++){
-        for(int j = 0; j < boxes[i].n_subscribers; i++){
+    for (int i = 0; i < n_boxes; i++) {
+        for (int j = 0; j < boxes[i].n_subscribers; i++) {
             printf("%s\n", boxes[i].subscribers[j]);
             int tx = open_pipe(boxes[i].subscribers[j], 'w');
             close(tx);
         }
     }
 
-    for(int i = 0; i < max_sessions; i++)
+    for (int i = 0; i < max_sessions; i++)
         free(&tid[i]);
-    
+
     free(queue);
 
-    //FIXME: Não é suposto??
+    // FIXME: Não é suposto??
     pthread_kill(main_thread, SIGINT);
 
     unlink(register_pipe_name);
@@ -54,9 +54,8 @@ void mbroker_close(){
 
 static void sig_handler(int sig) {
 
-
-    if (sig != SIGINT) 
-        return; 
+    if (sig != SIGINT)
+        return;
 
     // Catched SIGINT successfully
     mbroker_close();
@@ -68,7 +67,7 @@ void delete_box(int i) {
     uint64_t int_aux;
     uint8_t last_aux;
 
-    if(boxes[i].n_publishers == 1){
+    if (boxes[i].n_publishers == 1) {
 
         char publisher_pipe[PIPE_NAME_SIZE];
         strcpy(publisher_pipe, boxes[i].publisher);
@@ -142,7 +141,7 @@ void recieve_messages_from_publisher(register_request_t publisher,
     int box_handle = tfs_open(box_name, TFS_O_APPEND);
 
     uint8_t code;
-    //uint8_t subscriber_code = 10;
+    // uint8_t subscriber_code = 10;
     char message[MESSAGE_SIZE];
     char buffer[MESSAGE_SIZE];
     int pub_pipe = open_pipe(publisher.client_name_pipe_path, 'r');
@@ -155,8 +154,8 @@ void recieve_messages_from_publisher(register_request_t publisher,
 
     ssize_t bytes_read = read_pipe(pub_pipe, &code, sizeof(uint8_t));
     while (bytes_read > 0 && code == 9) {
-        
-        if((box_index = find_box(publisher.box_name)) == -1) {
+
+        if ((box_index = find_box(publisher.box_name)) == -1) {
             close(pub_pipe);
             break;
         }
@@ -173,9 +172,8 @@ void recieve_messages_from_publisher(register_request_t publisher,
         pthread_mutex_unlock(&box_mutexes[box_index]);
 
         bytes_read = read_pipe(pub_pipe, &code, sizeof(uint8_t));
-
     }
-    if(box_index != -1) {
+    if (box_index != -1) {
         boxes[box_index].n_publishers = 0;
         close(pub_pipe);
     }
@@ -225,30 +223,33 @@ void read_messages(register_request_t subscriber_request, int num) {
     int box_handle = tfs_open(box_name, 0);
     int box_index = find_box(subscriber_request.box_name);
 
-    int subscriber_pipe = open_pipe(subscriber_request.client_name_pipe_path, 'w');
+    int subscriber_pipe =
+        open_pipe(subscriber_request.client_name_pipe_path, 'w');
     if (num == 0)
         close(subscriber_pipe);
-    if (box_handle == -1 || box_index == -1)
+    if (box_handle == -1 || box_index == -1) {
         pcq_dequeue(queue);
         return;
-    
+    }
 
     uint8_t code = 10;
     char char_buffer;
     char buffer[MESSAGE_SIZE];
     int i = 0, j = 0;
-    //ssize_t bytes_read = tfs_read(box_handle, &char_buffer, sizeof(char));
+    // ssize_t bytes_read = tfs_read(box_handle, &char_buffer, sizeof(char));
 
-    while(true) {
+    while (true) {
 
-        if(pthread_mutex_lock(&box_mutexes[box_index]) != 0) {
+        if (pthread_mutex_lock(&box_mutexes[box_index]) != 0) {
             j++;
             exit(EXIT_FAILURE);
         }
         ssize_t bytes_read;
 
-        while((bytes_read = tfs_read(box_handle, &char_buffer, sizeof(char))) == 0) {
-            pthread_cond_wait(&box_conditions[box_index], &box_mutexes[box_index]);
+        while ((bytes_read =
+                    tfs_read(box_handle, &char_buffer, sizeof(char))) == 0) {
+            pthread_cond_wait(&box_conditions[box_index],
+                              &box_mutexes[box_index]);
         }
 
         if (char_buffer == '\0') {
@@ -260,7 +261,7 @@ void read_messages(register_request_t subscriber_request, int num) {
             if (write(subscriber_pipe, &buffer, MESSAGE_SIZE) < 1) {
                 exit(EXIT_FAILURE);
             }
-            
+
             // reset buffer e indíce
             memset(buffer, 0, MESSAGE_SIZE);
             i = 0;
@@ -268,7 +269,7 @@ void read_messages(register_request_t subscriber_request, int num) {
             buffer[i] = char_buffer;
             i++;
         }
-        if(j == 0)
+        if (j == 0)
             pthread_mutex_unlock(&box_mutexes[box_index]);
         j = 0;
     }
@@ -611,7 +612,6 @@ int main(int argc, char **argv) {
     // Can't catch SIGINT
     if (signal(SIGINT, sig_handler) == SIG_ERR)
         exit(EXIT_FAILURE);
-    
 
     (void)argc;
 

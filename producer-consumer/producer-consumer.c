@@ -68,7 +68,7 @@ int pcq_create(pc_queue_t *queue, size_t capacity) {
 // Memory: does not free the queue pointer itself
 int pcq_destroy(pc_queue_t *queue) {
     // Liberta a memória das threads
-    for (int i = 0; i < queue->pcq_capacity; i++){
+    for (int i = 0; i < queue->pcq_capacity; i++) {
         free(queue->pcq_buffer[i]);
     }
     queue->pcq_capacity = 0;
@@ -129,7 +129,6 @@ int pcq_enqueue(pc_queue_t *queue, void *elem) {
     }
     pthread_mutex_lock(&queue->pcq_current_size_lock);
 
-
     if (queue->pcq_tail == 0) {
         // Capacidade = 0
         if (queue->pcq_tail == queue->pcq_capacity) {
@@ -152,7 +151,7 @@ int pcq_enqueue(pc_queue_t *queue, void *elem) {
     }
     pthread_cond_signal(&queue->pcq_popper_condvar);
     pthread_mutex_unlock(&queue->pcq_current_size_lock);
-    if(should_unlock == 1) {
+    if (should_unlock == 1) {
         if (pthread_mutex_unlock(&queue->pcq_pusher_condvar_lock) != 0)
             exit(EXIT_FAILURE);
     }
@@ -182,7 +181,7 @@ void *pcq_dequeue(pc_queue_t *queue) {
 
     pthread_cond_signal(&queue->pcq_pusher_condvar);
     pthread_mutex_unlock(&queue->pcq_current_size_lock);
-    if(should_unlock == 1) {
+    if (should_unlock == 1) {
         if (pthread_mutex_unlock(&queue->pcq_popper_condvar_lock) != 0)
             exit(EXIT_FAILURE);
     }
