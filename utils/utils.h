@@ -54,6 +54,10 @@ typedef struct {
     int n;
 } man_args_t;
 
+typedef struct {
+    char client_name_pipe_path[PIPE_NAME_SIZE];
+    char box_name[BOX_NAME_SIZE];
+} thread_args;
 int create_pipe(char* pipename);
 int open_pipe(char* pipename, char mode);
 /*void write_pipe(int tx, char const *str);*/
