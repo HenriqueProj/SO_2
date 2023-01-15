@@ -25,7 +25,6 @@ int pcq_create(pc_queue_t *queue, size_t capacity) {
     queue->pcq_capacity = capacity;
     queue->pcq_current_size = 0;
 
-    // Out of bounds -> mesmo que NULL (Não existem threads)
     queue->pcq_head = 0;
     queue->pcq_tail = 0;
 
@@ -69,9 +68,9 @@ int pcq_create(pc_queue_t *queue, size_t capacity) {
 // Memory: does not free the queue pointer itself
 int pcq_destroy(pc_queue_t *queue) {
     // Liberta a memória das threads
-    for (int i = 0; i < queue->pcq_capacity; i++)
+    for (int i = 0; i < queue->pcq_capacity; i++){
         free(queue->pcq_buffer[i]);
-
+    }
     queue->pcq_capacity = 0;
     queue->pcq_current_size = 0;
 
@@ -161,7 +160,7 @@ int pcq_enqueue(pc_queue_t *queue, void *elem) {
 //
 // If the queue is empty, sleep until the queue has an element
 void *pcq_dequeue(pc_queue_t *queue) {
-    printf("DEQUEUE\n");
+
     if (pthread_mutex_lock(&queue->pcq_popper_condvar_lock) != 0)
         exit(EXIT_FAILURE);
 

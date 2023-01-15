@@ -23,6 +23,28 @@ pthread_t *tid;
 size_t max_sessions;
 pc_queue_t *queue;;
 
+// Liberta a memória antes de fechar o mbroker
+void mbroker_close(){
+    pcq_destroy(queue);
+
+    for(int i = 0; i < max_sessions; i++)
+        free(&tid[i]);
+
+    free(queue);
+
+    printf("That's all folks!\n");
+}
+
+static void sig_handler(int sig) {
+
+
+    if (sig != SIGINT) 
+        return; 
+
+    // Catched SIGINT successfully
+    mbroker_close();
+    exit(EXIT_SUCCESS);
+}
 
 void delete_box(int i) {
     char string_aux[PIPE_NAME_SIZE];
@@ -447,9 +469,6 @@ void *list_boxes(void *args) {
 }
 
 void *main_thread_function(void *arg) {
-    queue = (pc_queue_t *)malloc(sizeof(pc_queue_t));
-    pcq_create(queue, max_sessions);
-
     int *register_pipe = (int *)arg;
 
     uint8_t code;
@@ -560,6 +579,11 @@ void *main_thread_function(void *arg) {
 }
 
 int main(int argc, char **argv) {
+    // Can't catch SIGINT
+    if (signal(SIGINT, sig_handler) == SIG_ERR)
+        exit(EXIT_FAILURE);
+    
+
     (void)argc;
 
     tfs_init(NULL);
@@ -573,6 +597,9 @@ int main(int argc, char **argv) {
 
     tid = malloc(sizeof(pthread_t) * max_sessions);
 
+    queue = (pc_queue_t *)malloc(sizeof(pc_queue_t));
+    pcq_create(queue, max_sessions);
+    
     pthread_t main_thread;
 
     // Cria register_pipe
@@ -589,6 +616,8 @@ int main(int argc, char **argv) {
     }
 
     pthread_join(main_thread, NULL);
+
+    mbroker_close();
 
     printf("\nMbroker fechou\n\n");
     return 0;
