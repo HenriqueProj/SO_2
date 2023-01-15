@@ -29,6 +29,15 @@ void delete_box(int i) {
     uint64_t int_aux;
     uint8_t last_aux;
 
+    if(boxes[i].n_publishers == 1){
+
+        char publisher_pipe[PIPE_NAME_SIZE];
+        strcpy(publisher_pipe, boxes[i].publisher);
+        printf("\n\n%s\n\n", publisher_pipe);
+        int tx = open_pipe(publisher_pipe, 'r');
+        close(tx);
+        
+    }
     strcpy(string_aux, boxes[i].box_name);
     strcpy(boxes[i].box_name, boxes[n_boxes - 1].box_name);
     strcpy(boxes[n_boxes - 1].box_name, string_aux);
@@ -158,6 +167,7 @@ void *publisher_function(void *args) {
     }
 
     boxes[box_index].n_publishers = 1;
+    strcpy(boxes[box_index].publisher, arguments->client_name_pipe_path);
 
     recieve_messages_from_publisher(request, box_index, 1);
     return NULL;

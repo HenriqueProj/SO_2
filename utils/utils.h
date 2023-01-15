@@ -8,23 +8,30 @@
 
 // Maximo de boxes, equivalente ao numero maximo de inodes do tfs
 #define MAX_BOXES 64
+
+// Tamanhos máximos definidos no enunciado
 #define PIPE_NAME_SIZE 256
 #define BOX_NAME_SIZE 32
 #define MESSAGE_SIZE 1024
 
-// tive de tirar o attribute packed por causa da variável de condição
+// Estrutura correspondente a uma caixa
 typedef struct __attribute__((__packed__)) {
+    //Nome da caixa
     char box_name[BOX_NAME_SIZE];
+    // Nome do publisher associado
     char publisher[PIPE_NAME_SIZE];
 
     uint64_t box_size;
+    // 1 se tem um publisher, 0 caso contrário
     uint64_t n_publishers;
     uint64_t n_subscribers;
+
+    // Array dos subscribers
     char subscribers[MAX_BOXES][PIPE_NAME_SIZE];
     int subscriber_index;
+    
+    // Para a listagem das caixas
     uint8_t last;
-    pthread_cond_t condition;
-    pthread_mutex_t mutex;
 } box_t;
 
 // Structs para envio de pedidos por pipes
@@ -43,25 +50,38 @@ typedef struct __attribute__((__packed__)) {
     char error_message[MESSAGE_SIZE];
 } box_reply_t;
 
-typedef struct {
-    register_request_t publisher;
-    int box_index;
-} pub_args_t;
-
-typedef struct {
-    char *pipe_name;
-    int n;
-} man_args_t;
-
+// Struct que serve de argumento para as funções das threads de registo
 typedef struct {
     char client_name_pipe_path[PIPE_NAME_SIZE];
     char box_name[BOX_NAME_SIZE];
 } thread_args;
+
+/*
+    Cria um pipe, verificando se os return values estão todos como esperado.
+*/
 int create_pipe(char *pipename);
+
+/*
+    Abre um pipe para leitura ou escrita, consoante o caracter mode ('r' ou 'w'),
+    verificando se os return values estão todos como esperado.
+*/
 int open_pipe(char *pipename, char mode);
-/*void write_pipe(int tx, char const *str);*/
+
+/*
+    Preenche o resto de um array de caracteres com '\0', a fim de
+    cumprir o protocolo de envio de mensagens
+*/
 void fill_string(size_t size, char *array);
+
+/*
+    Lê de um pipe, verificando se os return values estão todos como esperado.
+*/
 ssize_t read_pipe(int rx, void *buffer, size_t size);
+
+/*
+    Função de comparação usada na aplicação do qsort,
+    para listagem das caixas em ordem alfabética
+*/
 int compare_structs(const void *a, const void *b);
 
 #endif
