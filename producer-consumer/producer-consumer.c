@@ -23,8 +23,8 @@ int pcq_create(pc_queue_t *queue, size_t capacity){
     queue->pcq_current_size = 0;
 
     // Out of bounds -> mesmo que NULL (Não existem threads)
-    queue->pcq_head = capacity;
-    queue->pcq_tail = capacity;
+    queue->pcq_head = 0;
+    queue->pcq_tail = 0;
 
     // Mutexes init
     if(pthread_mutex_init(&queue->pcq_current_size_lock, NULL) != 0){
@@ -117,23 +117,28 @@ int pcq_enqueue(pc_queue_t *queue, void *elem){
     while(queue->pcq_current_size == queue->pcq_capacity){
         pthread_cond_wait(&queue->pcq_pusher_condvar, &queue->pcq_pusher_condvar_lock);
     }
+    pthread_mutex_lock(&queue->pcq_current_size_lock);
+    if(queue->pcq_tail == 0) {
+        if(queue->pcq_tail == queue->pcq_capacity) {
+        queue->pcq_buffer[queue->pcq_tail] = NULL;
+        }
+        queue->pcq_buffer[queue->pcq_tail] = elem;
 
-    if(queue->pcq_current_size == 0){
-        // Pcq inicialmente vazia - acrescenta a head e tail no mesmo indice
-        queue->pcq_head = 0;
-
-        queue->pcq_tail = 0;
-    }
-    else{
         queue->pcq_tail++;
+        queue->pcq_current_size++;
     }
+    else {
+        
+        queue->pcq_tail++;
+        queue->pcq_current_size++;
 
-    queue->pcq_buffer[queue->pcq_current_size] = elem;
-    
-    queue->pcq_current_size++;
-
+        if(queue->pcq_tail == queue->pcq_capacity) {
+            queue->pcq_buffer[queue->pcq_tail] = NULL;
+        }
+        queue->pcq_buffer[queue->pcq_tail] = elem;
+    }
     pthread_cond_signal(&queue->pcq_popper_condvar);
-
+    pthread_mutex_unlock(&queue->pcq_current_size_lock);
     if (pthread_mutex_unlock(&queue->pcq_pusher_condvar_lock) != 0)
         exit(EXIT_FAILURE);
 
@@ -151,28 +156,15 @@ void *pcq_dequeue(pc_queue_t *queue){
     while(queue->pcq_current_size == 0){
         pthread_cond_wait(&queue->pcq_popper_condvar, &queue->pcq_popper_condvar_lock);
     }
-    if(queue->pcq_current_size == 1){
-        // 1 thread ativa - esvazia pcq
-        queue->pcq_current_size = 0;
-        queue->pcq_buffer[0] = NULL;
+    pthread_mutex_lock(&queue->pcq_current_size_lock);
+    queue->pcq_current_size--;
+    queue->pcq_head++;
 
-        // Out of bounds
-        queue->pcq_head = queue->pcq_capacity;
-        queue->pcq_tail = queue->pcq_capacity;
-    }
-    else{
-        // Puxa as threads ativas 1 indice para trás, coloca a última a NULL e dá tail--
-        for(int i = 1; i < queue->pcq_current_size; i++){
-            queue->pcq_buffer[i - 1] = queue->pcq_buffer[i];
-        }
-        queue->pcq_buffer[queue->pcq_current_size - 1] = NULL;
+    if(queue->pcq_head == queue->pcq_capacity)
+        queue->pcq_head = 0;
     
-        queue->pcq_tail--;
-        queue->pcq_current_size--;
-    }
-
     pthread_cond_signal(&queue->pcq_pusher_condvar);
-
+    pthread_mutex_unlock(&queue->pcq_current_size_lock);
     if (pthread_mutex_unlock(&queue->pcq_popper_condvar_lock) != 0)
         exit(EXIT_FAILURE);
 

@@ -13,7 +13,7 @@
 #define MESSAGE_SIZE 1024
 
 //tive de tirar o attribute packed por causa da variável de condição
-typedef struct {
+typedef struct __attribute__((__packed__)){
     char box_name[BOX_NAME_SIZE];
     char publisher[PIPE_NAME_SIZE];
 
@@ -27,11 +27,6 @@ typedef struct {
     pthread_mutex_t mutex;
 } box_t;
 
-typedef struct __attribute__((__packed__)) {
-    char client_name_pipe_path[PIPE_NAME_SIZE];
-    char box_name[BOX_NAME_SIZE];
-    struct subscriber *next;
-} subscriber;
 
 // Structs para envio de pedidos por pipes
 
@@ -48,12 +43,6 @@ typedef struct __attribute__((__packed__)){
     int32_t return_code;
     char error_message[MESSAGE_SIZE];
 } box_reply_t;
-
-// Envio de mensagem do publicador para servidor / servidor para subscritor
-// ou pedido de listagem de caixas
-typedef struct __attribute__((__packed__)){
-    char string[MESSAGE_SIZE];
-} message_exchange_t;
 
 typedef struct {
     register_request_t publisher;

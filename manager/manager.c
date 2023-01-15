@@ -20,7 +20,6 @@ int main(int argc, char **argv) {
     //caso seja para criar ou remover uma caixa
     if(argc > 4) {
         box_name = argv[4];
-       fill_string(BOX_NAME_SIZE, box_name);
     }
 
     //abre o pipe do servidor para mandar o pedido de registo
@@ -45,12 +44,13 @@ int main(int argc, char **argv) {
         //preenche o resto das strings com '\0'
         fill_string(PIPE_NAME_SIZE, request.client_name_pipe_path);
         fill_string(BOX_NAME_SIZE, request.box_name);
-
         //manda o pedido para o servidor
         if(write(register_pipe, &request_code, sizeof(uint8_t)) < 1)
             exit(EXIT_FAILURE);
         if(write(register_pipe, &request, sizeof(register_request_t)) < 1)
             exit(EXIT_FAILURE);
+            
+        close(register_pipe);
     }
     // Pedido de remoção de caixa
     else if(!strcmp(type, "remove") ){
@@ -63,13 +63,15 @@ int main(int argc, char **argv) {
 
         //preenche o resto das strigs com '\0'
         fill_string(PIPE_NAME_SIZE, request.client_name_pipe_path);
-        fill_string(PIPE_NAME_SIZE, request.box_name);
+        fill_string(BOX_NAME_SIZE, request.box_name);
 
         //manda o pedido para o servidor
         if(write(register_pipe, &request_code, sizeof(uint8_t)) < 1)
             exit(EXIT_FAILURE);
         if(write(register_pipe, &request, sizeof(register_request_t)) < 1)
             exit(EXIT_FAILURE);
+
+        close(register_pipe);
     }
     // Pedido de listagem de caixas
     else if(!strcmp(type, "list") ){
@@ -88,7 +90,8 @@ int main(int argc, char **argv) {
             exit(EXIT_FAILURE);
         if(write(register_pipe, &named_pipe, PIPE_NAME_SIZE) < 1)
             exit(EXIT_FAILURE);
-        
+
+        close(register_pipe);
     }
     
     //abre o pipe da manager para leitura

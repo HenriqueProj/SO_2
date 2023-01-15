@@ -21,6 +21,7 @@ size_t n_boxes;
 int n_active_threads = 0;
 pthread_t* tid;
 size_t max_sessions;
+pthread_mutex_t trinco = PTHREAD_MUTEX_INITIALIZER;
 
 void delete_box(int i){
     char string_aux[PIPE_NAME_SIZE];
@@ -242,13 +243,12 @@ void reply_to_box_creation(char* pipe_name, int n) {
     uint8_t code = 4;
 
     reply.return_code = 0;
-    fill_string(MESSAGE_SIZE, reply.error_message);
     //error creating box
     if(n == 0) {
         reply.return_code = -1;
+        fill_string(MESSAGE_SIZE, reply.error_message);
         strcpy(reply.error_message, "Couldn't create box");
     }
-    
     int manager_pipe = open_pipe(pipe_name, 'w');
 
 
@@ -268,24 +268,20 @@ void* create_box(void* args) {
     box_t box;
     register_request_t box_request;
     ssize_t bytes_read = read_pipe(*register_pipe, &box_request, sizeof(register_request_t));
-    
+    printf("%s\n", box_request.box_name);
     if(bytes_read == -1){
         reply_to_box_creation(box_request.client_name_pipe_path, 0);
         return NULL;
     }
-    int file_handle = find_in_dir(inode_get(ROOT_DIR_INUM), box_request.box_name);
+    pthread_mutex_lock(&trinco);
+    int box_index = find_box(box_request.box_name);
     
     //the box already exists
-    if(file_handle != -1){
+    if(box_index != -1){
         reply_to_box_creation(box_request.client_name_pipe_path, 0);
         return NULL;
     }
-    for(int cont = 0; cont < n_boxes; cont++){
-        if(!strcmp(boxes[cont].box_name, box_request.box_name) ){
-            reply_to_box_creation(box_request.client_name_pipe_path, 0);
-            return NULL;
-        }
-    }
+
     char box_name[BOX_NAME_SIZE + 1];
 
     box_name[0] = '/';
@@ -304,14 +300,14 @@ void* create_box(void* args) {
     strcpy(box.box_name, box_request.box_name);
     
 
-    if (pthread_cond_init(&box.condition, NULL) != 0)
-        exit(EXIT_FAILURE);
+    //if (pthread_cond_init(&box.condition, NULL) != 0)
+    //    exit(EXIT_FAILURE);
 
     tfs_close(box_handle);
 
     //adicionar box a um array de boxes global
     add_box(box);
-
+    pthread_mutex_unlock(&trinco);
     reply_to_box_creation(box_request.client_name_pipe_path, 1);
     return NULL;
 }
@@ -351,17 +347,14 @@ void* remove_box(void* args) {
     char box_name[BOX_NAME_SIZE + 1];
     box_name[0] = '/';
     ssize_t bytes_read = read_pipe(*register_pipe, &box_request, sizeof(register_request_t));
-
+    printf("%s\n", box_request.box_name);
+    
     if(bytes_read == -1){
         reply_to_box_removal(box_request.client_name_pipe_path, 0);
         return NULL;
     }
     strcpy(box_name+1, box_request.box_name);
-    //the box doesn't exist
-    //if(find_in_dir(inode_get(ROOT_DIR_INUM), box_request.box_name) == -1){
-    //    reply_to_box_removal(box_request.client_name_pipe_path, 0);
-    //    return;
-    //}
+
     //unlink file associated to box
     int box_handle = tfs_unlink(box_name);
 
@@ -371,23 +364,16 @@ void* remove_box(void* args) {
     }
 
     //verifica se está no array global
-    int ver = -1;
+    int box_index = find_box(box_request.box_name);
 
-    for(int cont = 0; cont < n_boxes; cont++){
-        if(!strcmp(boxes[cont].box_name, box_request.box_name)){
-            // Índice da box no array
-            ver = cont;
-            break;
-        }
-    }
     // Box não está no array global
-    if(ver == -1){
+    if(box_index == -1){
         reply_to_box_removal(box_request.client_name_pipe_path, 0);
         return NULL;
     }
 
     //free box from array
-    delete_box(ver);
+    delete_box(box_index);
     reply_to_box_removal(box_request.client_name_pipe_path, 1);
 
     return NULL;
@@ -451,7 +437,7 @@ void* list_boxes(void* args){
 void* main_thread_function(void* arg){
     pc_queue_t *queue;
 
-    queue = (pc_queue_t*)malloc(sizeof(pc_queue_t) );
+    queue = (pc_queue_t*)malloc(sizeof(pc_queue_t));
     pcq_create(queue, max_sessions);
 
     int* register_pipe = (int*) arg;
@@ -459,74 +445,63 @@ void* main_thread_function(void* arg){
     uint8_t code;
 
     ssize_t bytes_read; //= read_pipe(register_pipe, &code, sizeof(uint8_t));
-   
     while((bytes_read = read_pipe(*register_pipe, &code, sizeof(uint8_t))) != -1) {
         //if(bytes_read > 0){
         //}
         switch(code) {
         case 1:
                 //register publisher
-                int index1 = n_active_threads;
-                pcq_enqueue(queue, &tid[index1]);
+                //int index1 = n_active_threads;
+                if(pcq_enqueue(queue, &tid[queue->pcq_tail]) == 0) {
 
-                if(pthread_create(&tid[index1], NULL, publisher_function, (void*)register_pipe ) != 0){
-                    fprintf(stderr, "[ERR]: Fail to create list boxes thread: %s\n", strerror(errno));
-                    exit(EXIT_FAILURE);
-                }
-                ////pthread_join(tid[index1], NULL);
-
+                    if(pthread_create(&tid[queue->pcq_tail], NULL, publisher_function, (void*)register_pipe ) != 0){
+                        exit(EXIT_FAILURE);
+                    }
                 pcq_dequeue(queue);
+                }
                 break;
         case 2:
                 //register subscriber
-                int index2 = n_active_threads;
-                pcq_enqueue(queue, &tid[index2]);
+                //int index2 = n_active_threads;
+                if(pcq_enqueue(queue, &tid[queue->pcq_tail]) == 0) {
 
-                if(pthread_create(&tid[index2], NULL, register_subscriber, (void*)register_pipe ) != 0){
-                    fprintf(stderr, "[ERR]: Fail to create list boxes thread: %s\n", strerror(errno));
-                    exit(EXIT_FAILURE);
-                }
-                //pthread_join(tid[index2], NULL);
-
+                    if(pthread_create(&tid[queue->pcq_tail], NULL, register_subscriber, (void*)register_pipe ) != 0){
+                        exit(EXIT_FAILURE);
+                    }
                 pcq_dequeue(queue);
+                }
                 break;
         case 3:
                 //create box
-                int index3 = n_active_threads;
-                pcq_enqueue(queue, &tid[index3]);
-
-                if(pthread_create(&tid[index3], NULL, create_box, (void*)register_pipe ) != 0){
-                    fprintf(stderr, "[ERR]: Fail to create list boxes thread: %s\n", strerror(errno));
-                    exit(EXIT_FAILURE);
-                }
-                //pthread_join(tid[index3], NULL);
-
+                //int index3 = n_active_threads;
+                if(pcq_enqueue(queue, &tid[queue->pcq_tail]) == 0) {
+                    
+                    if(pthread_create(&tid[queue->pcq_tail], NULL, create_box, (void*)register_pipe ) != 0){
+                        exit(EXIT_FAILURE);
+                    }
                 pcq_dequeue(queue);
+                }
                 break;
         case 5:
                 //box removal
-                int index5 = n_active_threads;
-                pcq_enqueue(queue, &tid[index5]);
+                //int index5 = n_active_threads;
+                if(pcq_enqueue(queue, &tid[queue->pcq_tail]) == 0) {
 
-                if(pthread_create(&tid[index5], NULL, remove_box, (void*)register_pipe ) != 0){
-                    fprintf(stderr, "[ERR]: Fail to create list boxes thread: %s\n", strerror(errno));
-                    exit(EXIT_FAILURE);
-                }
-                //pthread_join(tid[index5], NULL);
-
+                    if(pthread_create(&tid[queue->pcq_tail], NULL, remove_box, (void*)register_pipe ) != 0){
+                        exit(EXIT_FAILURE);
+                    }
                 pcq_dequeue(queue);
+                }
                 break;
         case 7:
-                int index7 = n_active_threads;
-                pcq_enqueue(queue, &tid[index7]);
+                //int index7 = n_active_threads;
+                if(pcq_enqueue(queue, &tid[queue->pcq_tail]) == 0) {
 
-                if(pthread_create(&tid[index7], NULL, list_boxes, (void*)register_pipe ) != 0){
-                    fprintf(stderr, "[ERR]: Fail to create list boxes thread: %s\n", strerror(errno));
-                    exit(EXIT_FAILURE);
-                }
-                //pthread_join(tid[index7], NULL);
-
+                    if(pthread_create(&tid[queue->pcq_tail], NULL, list_boxes, (void*)register_pipe ) != 0){
+                        exit(EXIT_FAILURE);
+                    }
                 pcq_dequeue(queue);
+                }
                 break;
         default:
                 break;

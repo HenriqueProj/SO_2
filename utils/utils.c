@@ -13,39 +13,41 @@
 
 int create_pipe(char* pipename){
     // Remove pipe if it does not exist
-    char src[6] = "/tmp/";
-    char *source;
-    source = malloc(sizeof(char) * strlen(src) + 1);
-    strcpy(source, src);
-    strcat(source, pipename);
-    if (unlink(source) != 0 && errno != ENOENT) {
+    char* src;
+    src = malloc(sizeof(char) * (PIPE_NAME_SIZE + 5));
+    strcpy(src, "/tmp/");
+    strcat(src, pipename);
+    if (unlink(src) != 0 && errno != ENOENT) {
         printf("Register pipe: Destroy failed");
+        free(src);
         return 0;
     }
     // Create pipe
-    if (mkfifo(source, 0640) != 0) {
+    if (mkfifo(src, 0640) != 0) {
         printf("Register pipe: mkfifo failed");
+        free(src);
         return 0;
     }
-   
+    free(src);
     return 1;
 }
 
 int open_pipe(char* pipename, char mode){
     int tx;
-    char src[6] = "/tmp/";
-    char *source;
-    source = malloc(sizeof(char) * strlen(src) + 1);
-    strcpy(source, src);
-    strcat(source, pipename);
-    if(mode == 'w')
-        tx = open(source, O_WRONLY);
+    char* src;
+    src = malloc(sizeof(char) * (PIPE_NAME_SIZE + 5));
+    strcpy(src, "/tmp/");
+    strcat(src, pipename);
+    if(mode == 'w') 
+        tx = open(src, O_WRONLY);
     else
-        tx = open(source, O_RDONLY);
+        tx = open(src, O_RDONLY);
     if (tx == -1) {
         fprintf(stderr, "[ERR]: open failed: %s\n", strerror(errno));
+        free(src);
         return 0;
     }
+    free(src);
     return tx;
 }
 /*
@@ -67,7 +69,7 @@ void write_pipe(int tx, char const *str) {
 void fill_string(size_t size, char* array){
     size_t len = strlen(array);
     
-    memset(array + len, '\0', size - len  );
+    memset(array + len, '\0', size - len);
 }
 
 // Lê do pipe e verifica o return value
