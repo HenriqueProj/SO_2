@@ -8,12 +8,13 @@
 
 int n_messages = 0;
 char *sub_name;
-
+int tx;
 // Dá print da mensagem após ser sinalizado o final da sessão
 static void handle() {
 
     fprintf(stdout, "Subscriber %s recebeu %d mensagens\n", sub_name,
             n_messages);
+    close(tx);
     exit(1);
 }
 
@@ -67,7 +68,7 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
 
     // abre o seu pipe para leitura, para receber mensagens
-    int tx = open_pipe(sub_pipename, 'r');
+    tx = open_pipe(sub_pipename, 'r');
 
     // caso haja erro ao abrir o seu pipe
     if (tx == 0)

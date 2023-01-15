@@ -111,6 +111,7 @@ int pcq_destroy(pc_queue_t *queue) {
 //
 // If the queue is full, sleep until the queue has space
 int pcq_enqueue(pc_queue_t *queue, void *elem) {
+    int should_unlock = 1;
 
     if (pthread_mutex_lock(&queue->pcq_pusher_condvar_lock) != 0)
         exit(EXIT_FAILURE);
@@ -118,6 +119,7 @@ int pcq_enqueue(pc_queue_t *queue, void *elem) {
     while (queue->pcq_current_size == queue->pcq_capacity) {
         pthread_cond_wait(&queue->pcq_pusher_condvar,
                           &queue->pcq_pusher_condvar_lock);
+        should_unlock = 0;
     }
     pthread_mutex_lock(&queue->pcq_current_size_lock);
     if (queue->pcq_tail == 0) {
@@ -140,9 +142,10 @@ int pcq_enqueue(pc_queue_t *queue, void *elem) {
     }
     pthread_cond_signal(&queue->pcq_popper_condvar);
     pthread_mutex_unlock(&queue->pcq_current_size_lock);
-    if (pthread_mutex_unlock(&queue->pcq_pusher_condvar_lock) != 0)
-        exit(EXIT_FAILURE);
-
+    if(should_unlock == 1) {
+        if (pthread_mutex_unlock(&queue->pcq_pusher_condvar_lock) != 0)
+            exit(EXIT_FAILURE);
+    }
     return 0;
 }
 
@@ -150,13 +153,14 @@ int pcq_enqueue(pc_queue_t *queue, void *elem) {
 //
 // If the queue is empty, sleep until the queue has an element
 void *pcq_dequeue(pc_queue_t *queue) {
-
+    int should_unlock = 1;
     if (pthread_mutex_lock(&queue->pcq_popper_condvar_lock) != 0)
         exit(EXIT_FAILURE);
 
     while (queue->pcq_current_size == 0) {
         pthread_cond_wait(&queue->pcq_popper_condvar,
                           &queue->pcq_popper_condvar_lock);
+        should_unlock = 0;
     }
     pthread_mutex_lock(&queue->pcq_current_size_lock);
     queue->pcq_current_size--;
@@ -167,8 +171,9 @@ void *pcq_dequeue(pc_queue_t *queue) {
 
     pthread_cond_signal(&queue->pcq_pusher_condvar);
     pthread_mutex_unlock(&queue->pcq_current_size_lock);
-    if (pthread_mutex_unlock(&queue->pcq_popper_condvar_lock) != 0)
-        exit(EXIT_FAILURE);
-
+    if(should_unlock == 1) {
+        if (pthread_mutex_unlock(&queue->pcq_popper_condvar_lock) != 0)
+            exit(EXIT_FAILURE);
+    }
     return NULL;
 }

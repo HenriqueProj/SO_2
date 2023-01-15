@@ -23,8 +23,6 @@ typedef struct __attribute__((__packed__)) {
     char subscribers[MAX_BOXES][PIPE_NAME_SIZE];
     int subscriber_index;
     uint8_t last;
-    pthread_cond_t condition;
-    pthread_mutex_t mutex;
 } box_t;
 
 // Structs para envio de pedidos por pipes

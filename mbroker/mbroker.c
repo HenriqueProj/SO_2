@@ -17,11 +17,11 @@
 #include <utils.h>
 
 box_t boxes[MAX_BOXES];
+pthread_cond_t box_conditions[MAX_BOXES];
+pthread_mutex_t box_mutexes[MAX_BOXES];
 size_t n_boxes;
-int n_active_threads = 0;
 pthread_t *tid;
 size_t max_sessions;
-pthread_mutex_t trinco = PTHREAD_MUTEX_INITIALIZER;
 
 void delete_box(int i) {
     char string_aux[PIPE_NAME_SIZE];
@@ -52,11 +52,16 @@ void delete_box(int i) {
     boxes[i].last = boxes[n_boxes - 1].last;
     boxes[n_boxes - 1].last = last_aux;
 
+    pthread_cond_destroy(&box_conditions[n_boxes]);
+    pthread_mutex_destroy(&box_mutexes[n_boxes]);
+
     n_boxes--;
 }
 
 void add_box(box_t box) {
     boxes[n_boxes] = box;
+    pthread_cond_init(&box_conditions[n_boxes], NULL);
+    pthread_mutex_init(&box_mutexes[n_boxes], NULL);
     n_boxes++;
 }
 
@@ -89,10 +94,9 @@ void recieve_messages_from_publisher(register_request_t publisher,
     int box_handle = tfs_open(box_name, TFS_O_APPEND);
 
     uint8_t code;
-    uint8_t subscriber_code = 10;
+    //uint8_t subscriber_code = 10;
     char message[MESSAGE_SIZE];
     char buffer[MESSAGE_SIZE];
-
     int pub_pipe = open_pipe(publisher.client_name_pipe_path, 'r');
 
     if (ver == 0) {
@@ -102,28 +106,30 @@ void recieve_messages_from_publisher(register_request_t publisher,
 
     ssize_t bytes_read = read_pipe(pub_pipe, &code, sizeof(uint8_t));
     while (bytes_read > 0 && code == 9) {
+        
+        if((box_index = find_box(publisher.box_name)) == -1) {
+            close(pub_pipe);
+            break;
+        }
+
         read_pipe(pub_pipe, &buffer, MESSAGE_SIZE);
         strcpy(message, buffer);
         message[strlen(buffer)] = '\0';
+        printf("%s\n", message);
+        pthread_mutex_lock(&box_mutexes[box_index]);
         tfs_write(box_handle, message, strlen(message));
         tfs_write(box_handle, "\0", sizeof(char));
         boxes[box_index].box_size += strlen(message);
-        printf("%s\n", message);
+        pthread_cond_broadcast(&box_conditions[box_index]);
+        pthread_mutex_unlock(&box_mutexes[box_index]);
 
-        for (int i = 0; i < boxes[box_index].subscriber_index; i++) {
-            int subscriber_pipe =
-                open_pipe(boxes[box_index].subscribers[i], 'w');
-            if (write(subscriber_pipe, &subscriber_code, sizeof(uint8_t)) < 1) {
-                exit(EXIT_FAILURE);
-            }
-            if (write(subscriber_pipe, &buffer, MESSAGE_SIZE) < 1) {
-                exit(EXIT_FAILURE);
-            }
-        }
         bytes_read = read_pipe(pub_pipe, &code, sizeof(uint8_t));
+
     }
-    boxes[box_index].n_publishers = 0;
-    close(pub_pipe);
+    if(box_index != -1) {
+        boxes[box_index].n_publishers = 0;
+        close(pub_pipe);
+    }
     tfs_close(box_handle);
 }
 
@@ -165,27 +171,35 @@ void read_messages(register_request_t subscriber_request, int num) {
     box_name[0] = '/';
     strcpy(box_name + 1, subscriber_request.box_name);
     int box_handle = tfs_open(box_name, 0);
+    int box_index = find_box(subscriber_request.box_name);
 
-    int subscriber_pipe =
-        open_pipe(subscriber_request.client_name_pipe_path, 'w');
-
+    int subscriber_pipe = open_pipe(subscriber_request.client_name_pipe_path, 'w');
     if (num == 0)
         close(subscriber_pipe);
-
-    if (box_handle == -1 || subscriber_pipe == -1) {
+    if (box_handle == -1 || box_index == -1)
         return;
-    }
+    
 
     uint8_t code = 10;
     char char_buffer;
     char buffer[MESSAGE_SIZE];
-    int i = 0;
-    ssize_t bytes_read = tfs_read(box_handle, &char_buffer, sizeof(char));
+    int i = 0, j = 0;
+    //ssize_t bytes_read = tfs_read(box_handle, &char_buffer, sizeof(char));
 
-    while (bytes_read > 0) {
+    while(true) {
+
+        if(pthread_mutex_lock(&box_mutexes[box_index]) != 0) {
+            j++;
+            exit(EXIT_FAILURE);
+        }
+        ssize_t bytes_read;
+
+        while((bytes_read = tfs_read(box_handle, &char_buffer, sizeof(char))) == 0) {
+            pthread_cond_wait(&box_conditions[box_index], &box_mutexes[box_index]);
+        }
+
         if (char_buffer == '\0') {
             buffer[i] = '\0';
-
             fill_string(MESSAGE_SIZE, buffer);
             if (write(subscriber_pipe, &code, sizeof(uint8_t)) < 1) {
                 exit(EXIT_FAILURE);
@@ -193,6 +207,7 @@ void read_messages(register_request_t subscriber_request, int num) {
             if (write(subscriber_pipe, &buffer, MESSAGE_SIZE) < 1) {
                 exit(EXIT_FAILURE);
             }
+            
             // reset buffer e indíce
             memset(buffer, 0, MESSAGE_SIZE);
             i = 0;
@@ -200,7 +215,9 @@ void read_messages(register_request_t subscriber_request, int num) {
             buffer[i] = char_buffer;
             i++;
         }
-        bytes_read = tfs_read(box_handle, &char_buffer, sizeof(char));
+        if(j == 0)
+            pthread_mutex_unlock(&box_mutexes[box_index]);
+        j = 0;
     }
 
     tfs_close(box_handle);
@@ -211,7 +228,6 @@ void *register_subscriber(void *args) {
     thread_args const *arguments = (thread_args const *)args;
 
     register_request_t subscriber_request;
-
     strcpy(subscriber_request.client_name_pipe_path,
            arguments->client_name_pipe_path);
     strcpy(subscriber_request.box_name, arguments->box_name);
@@ -235,7 +251,6 @@ void *register_subscriber(void *args) {
     add_subscriber_to_box(box_index, subscriber_request.client_name_pipe_path);
     // Subscriber created sucessfully, will wait for messages to be written in
     // message box
-
     read_messages(subscriber_request, 1);
 
     return NULL;
@@ -272,8 +287,6 @@ void *create_box(void *args) {
     register_request_t box_request;
     strcpy(box_request.client_name_pipe_path, arguments->client_name_pipe_path);
     strcpy(box_request.box_name, arguments->box_name);
-    printf("box_name:%s, pipe_name:%s\n", box_request.box_name,
-           box_request.client_name_pipe_path);
 
     int box_index = find_box(box_request.box_name);
 
