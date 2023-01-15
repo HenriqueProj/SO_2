@@ -17,7 +17,7 @@ static void sig_handler(int sig) {
         //
         if (signal(SIGPIPE, sig_handler) == SIG_ERR)
             exit(EXIT_FAILURE);
-        printf("SIGPIPE!\n");
+      
         close(tx);
         unlink(pub_pipename);
     }
