@@ -240,6 +240,11 @@ void read_messages(register_request_t subscriber_request, int num) {
 
     while (true) {
 
+        if ((box_index = find_box(subscriber_request.box_name)) == -1) {
+            close(subscriber_pipe);
+            break;
+        }
+
         if (pthread_mutex_lock(&box_mutexes[box_index]) != 0) {
             j++;
             exit(EXIT_FAILURE);
@@ -441,6 +446,7 @@ void *remove_box(void *args) {
     }
 
     // free box from array
+    pthread_cond_broadcast(&box_conditions[box_index]);
     delete_box(box_index);
     reply_to_box_removal(box_request.client_name_pipe_path, 1);
 
