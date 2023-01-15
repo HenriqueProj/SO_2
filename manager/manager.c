@@ -42,8 +42,7 @@ int main(int argc, char **argv) {
         // preenche o resto das strings com '\0'
         fill_string(PIPE_NAME_SIZE, request.client_name_pipe_path);
         fill_string(BOX_NAME_SIZE, request.box_name);
-        printf("box_name:%s, pipe_name:%s\n", request.box_name,
-               request.client_name_pipe_path);
+       
         // manda o pedido para o servidor
         if (write(register_pipe, &request_code, sizeof(uint8_t)) < 1)
             exit(EXIT_FAILURE);
@@ -64,8 +63,7 @@ int main(int argc, char **argv) {
         // preenche o resto das strigs com '\0'
         fill_string(PIPE_NAME_SIZE, request.client_name_pipe_path);
         fill_string(BOX_NAME_SIZE, request.box_name);
-        printf("box_name:%s, pipe_name:%s\n", request.box_name,
-               request.client_name_pipe_path);
+       ;
         // manda o pedido para o servidor
         if (write(register_pipe, &request_code, sizeof(uint8_t)) < 1)
             exit(EXIT_FAILURE);
