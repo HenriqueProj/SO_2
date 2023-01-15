@@ -21,7 +21,8 @@ size_t n_boxes;
 int n_active_threads = 0;
 pthread_t *tid;
 size_t max_sessions;
-pthread_mutex_t trinco = PTHREAD_MUTEX_INITIALIZER;
+pc_queue_t *queue;;
+
 
 void delete_box(int i) {
     char string_aux[PIPE_NAME_SIZE];
@@ -97,6 +98,7 @@ void recieve_messages_from_publisher(register_request_t publisher,
 
     if (ver == 0) {
         close(pub_pipe);
+        pcq_dequeue(queue);
         return;
     }
 
@@ -124,6 +126,8 @@ void recieve_messages_from_publisher(register_request_t publisher,
     }
     boxes[box_index].n_publishers = 0;
     close(pub_pipe);
+
+    pcq_dequeue(queue);
     tfs_close(box_handle);
 }
 
@@ -173,6 +177,7 @@ void read_messages(register_request_t subscriber_request, int num) {
         close(subscriber_pipe);
 
     if (box_handle == -1 || subscriber_pipe == -1) {
+        pcq_dequeue(queue);
         return;
     }
 
@@ -205,6 +210,8 @@ void read_messages(register_request_t subscriber_request, int num) {
 
     tfs_close(box_handle);
     close(subscriber_pipe);
+
+    pcq_dequeue(queue);
 }
 
 void *register_subscriber(void *args) {
@@ -263,6 +270,8 @@ void reply_to_box_creation(char *pipe_name, int n) {
         exit(EXIT_FAILURE);
     }
     close(manager_pipe);
+
+    pcq_dequeue(queue);
 }
 
 void *create_box(void *args) {
@@ -335,6 +344,7 @@ void reply_to_box_removal(char *pipe_name, int n) {
         printf("Writing error\n");
         exit(EXIT_FAILURE);
     }
+    pcq_dequeue(queue);
 }
 
 void *remove_box(void *args) {
@@ -412,6 +422,7 @@ void reply_to_list_boxes(char *manager_pipe) {
         // Reseta o last para no segundo list não bloquear neste elemento
         boxes[n_boxes - 1].last = 0;
     }
+    pcq_dequeue(queue);
 }
 
 void *list_boxes(void *args) {
@@ -426,8 +437,6 @@ void *list_boxes(void *args) {
 }
 
 void *main_thread_function(void *arg) {
-    pc_queue_t *queue;
-
     queue = (pc_queue_t *)malloc(sizeof(pc_queue_t));
     pcq_create(queue, max_sessions);
 
@@ -460,7 +469,6 @@ void *main_thread_function(void *arg) {
                                    (void *)&args) != 0) {
                     exit(EXIT_FAILURE);
                 }
-                pcq_dequeue(queue);
             }
             break;
         case 2:
@@ -479,7 +487,6 @@ void *main_thread_function(void *arg) {
                                    (void *)&args) != 0) {
                     exit(EXIT_FAILURE);
                 }
-                pcq_dequeue(queue);
             }
             break;
         case 3:
@@ -499,7 +506,6 @@ void *main_thread_function(void *arg) {
                                    (void *)&args) != 0) {
                     exit(EXIT_FAILURE);
                 }
-                pcq_dequeue(queue);
             }
             break;
         case 5:
@@ -518,7 +524,6 @@ void *main_thread_function(void *arg) {
                                    (void *)&args) != 0) {
                     exit(EXIT_FAILURE);
                 }
-                pcq_dequeue(queue);
             }
             break;
         case 7:
@@ -534,7 +539,6 @@ void *main_thread_function(void *arg) {
                                    (void *)&pipe_name) != 0) {
                     exit(EXIT_FAILURE);
                 }
-                pcq_dequeue(queue);
             }
             break;
         default:

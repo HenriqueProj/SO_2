@@ -150,7 +150,7 @@ int pcq_enqueue(pc_queue_t *queue, void *elem) {
 //
 // If the queue is empty, sleep until the queue has an element
 void *pcq_dequeue(pc_queue_t *queue) {
-
+    printf("DEQUEUE\n");
     if (pthread_mutex_lock(&queue->pcq_popper_condvar_lock) != 0)
         exit(EXIT_FAILURE);
 
