@@ -103,9 +103,6 @@ int main(int argc, char **argv) {
         bytes_read = read_pipe(tx, &code, sizeof(uint8_t));
     }
 
-    // Saiu do loop por erro
-    fprintf(stderr, "[ERR]: READ FAILED: %s\n", strerror(errno));
-
     close_sub();
 
     return 0;

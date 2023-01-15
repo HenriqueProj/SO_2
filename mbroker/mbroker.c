@@ -22,7 +22,7 @@ pthread_mutex_t box_mutexes[MAX_BOXES];
 size_t n_boxes;
 pthread_t *tid;
 size_t max_sessions;
-
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_t *tid;
 pthread_t main_thread;
 pc_queue_t *queue;
@@ -63,6 +63,7 @@ static void sig_handler(int sig) {
 }
 
 void delete_box(int i) {
+    pthread_mutex_lock(&mutex);
     char string_aux[PIPE_NAME_SIZE];
     uint64_t int_aux;
     uint8_t last_aux;
@@ -103,32 +104,40 @@ void delete_box(int i) {
     pthread_mutex_destroy(&box_mutexes[n_boxes]);
 
     n_boxes--;
+    pthread_mutex_unlock(&mutex);
 }
 
 void add_box(box_t box) {
+    pthread_mutex_lock(&mutex);
     boxes[n_boxes] = box;
     pthread_cond_init(&box_conditions[n_boxes], NULL);
     pthread_mutex_init(&box_mutexes[n_boxes], NULL);
     n_boxes++;
+    pthread_mutex_unlock(&mutex);
 }
 
 int find_box(char *box_name) {
     char *name;
+    pthread_mutex_lock(&mutex);
     for (int i = 0; i < n_boxes; i++) {
         name = boxes[i].box_name;
 
         if (!strcmp(name, box_name)) {
+            pthread_mutex_unlock(&mutex);
             return i;
         }
     }
+    pthread_mutex_unlock(&mutex);
     return -1;
 }
 
 void add_subscriber_to_box(int box_index, char *subscriber_pipe_name) {
+    pthread_mutex_lock(&mutex);
     int i = boxes[box_index].subscriber_index;
     strncpy(boxes[box_index].subscribers[i], subscriber_pipe_name,
             PIPE_NAME_SIZE);
     boxes[box_index].subscriber_index++;
+    pthread_mutex_unlock(&mutex);
 }
 
 void recieve_messages_from_publisher(register_request_t publisher,
@@ -255,6 +264,11 @@ void read_messages(register_request_t subscriber_request, int num) {
                     tfs_read(box_handle, &char_buffer, sizeof(char))) == 0) {
             pthread_cond_wait(&box_conditions[box_index],
                               &box_mutexes[box_index]);
+
+            if ((box_index = find_box(subscriber_request.box_name)) == -1) {
+                close(subscriber_pipe);
+                break;
+            }
         }
 
         if (char_buffer == '\0') {
@@ -278,7 +292,9 @@ void read_messages(register_request_t subscriber_request, int num) {
             pthread_mutex_unlock(&box_mutexes[box_index]);
         j = 0;
     }
-
+    if(boxes[box_index].n_subscribers > 0 && box_index >= 0) 
+        boxes[box_index].n_subscribers = boxes[box_index].n_subscribers - 1;
+    
     tfs_close(box_handle);
     close(subscriber_pipe);
 
@@ -479,7 +495,9 @@ void reply_to_list_boxes(char *manager_pipe) {
         if (write(man_pipe, &reply_box, sizeof(box_t)) < 1)
             exit(EXIT_FAILURE);
     } else {
+        pthread_mutex_lock(&mutex);
         boxes[n_boxes - 1].last = 1;
+        pthread_mutex_unlock(&mutex);
 
         for (i = 0; i < n_boxes; i++) {
             reply_box = boxes[i];
