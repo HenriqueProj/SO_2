@@ -11,12 +11,23 @@
 #include <unistd.h>
 #include <utils.h>
 
+// Tamanho do prefixo /tmp/ a ser adicionado aos nomes dos pipes
+#define TMP_SIZE 5
+
 int create_pipe(char *pipename) {
-    // Remove pipe if it does not exist
+    //"/tmp/" adicionado ao nome do pipe, para que a criação de pipes 
+    // funcione na plataforma sigma.
+
     char *src;
-    src = malloc(sizeof(char) * (PIPE_NAME_SIZE + 5));
+
+    // Aloca o espaço para o pipename + /tmp/
+    src = malloc(sizeof(char) * (PIPE_NAME_SIZE + TMP_SIZE));
+
+    // Adiciona o prefixo ao nome do pipe
     strcpy(src, "/tmp/");
     strcat(src, pipename);
+
+    // Falha ao destruir o pipe, caso já exista
     if (unlink(src) != 0 && errno != ENOENT) {
         printf("Register pipe: Destroy failed");
         free(src);
@@ -33,15 +44,28 @@ int create_pipe(char *pipename) {
 }
 
 int open_pipe(char *pipename, char mode) {
+    //"/tmp/" adicionado ao nome do pipe, para que a criação de pipes 
+    // funcione na plataforma sigma.
+
     int tx;
     char *src;
-    src = malloc(sizeof(char) * (PIPE_NAME_SIZE + 5));
+
+    // Aloca o espaço para o pipename + /tmp/
+    src = malloc(sizeof(char) * (PIPE_NAME_SIZE + TMP_SIZE));
+
+    // Adiciona o prefixo ao nome do pipe
     strcpy(src, "/tmp/");
     strcat(src, pipename);
+
+    // Modo de escrita
     if (mode == 'w')
         tx = open(src, O_WRONLY);
+    
+    // Modo de leitura
     else
         tx = open(src, O_RDONLY);
+    
+    // Erro na abertura do pipe
     if (tx == -1) {
         fprintf(stderr, "[ERR]: open failed: %s\n", strerror(errno));
         free(src);
@@ -50,22 +74,7 @@ int open_pipe(char *pipename, char mode) {
     free(src);
     return tx;
 }
-/*
-void write_pipe(int tx, char const *str) {
-    size_t len = strlen(str);
-    size_t written = 0;
 
-    while (written < len) {
-        ssize_t ret = write(tx, str + written, len - written);
-        if (ret < 0) {
-            fprintf(stderr, "[ERR]: write failed: %s\n", strerror(errno));
-            exit(EXIT_FAILURE);
-        }
-
-        written += ret;
-    }
-}
-*/
 void fill_string(size_t size, char *array) {
     size_t len = strlen(array);
 
@@ -77,6 +86,7 @@ ssize_t read_pipe(int rx, void *buffer, size_t size) {
 
     ssize_t ret = read(rx, buffer, size);
 
+    // Falha na leitura do pipe
     if (ret == -1) {
         fprintf(stderr, "[ERR]: read failed: %s\n", strerror(errno));
         return -1;
@@ -85,8 +95,11 @@ ssize_t read_pipe(int rx, void *buffer, size_t size) {
 }
 
 int compare_structs(const void *a, const void *b) {
-    char const *l = ((box_t *)a)->box_name;
-    char const *r = ((box_t *)b)->box_name;
+    // Converte void* em box_t* (ponteiro para struct de caixa)
+    // e retira os nomes das caixas
+    char const *box_name1 = ((box_t *)a)->box_name;
+    char const *box_name2 = ((box_t *)b)->box_name;
 
-    return strcmp(l, r);
+    // Função de comparação escolhida - strcmp
+    return strcmp(box_name1, box_name2);
 }

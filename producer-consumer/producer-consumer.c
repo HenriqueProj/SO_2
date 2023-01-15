@@ -13,8 +13,10 @@
 // Memory: the queue pointer must be previously allocated
 // (either on the stack or the heap)
 int pcq_create(pc_queue_t *queue, size_t capacity) {
+    // Aloca o espaço para as threads
     queue->pcq_buffer = malloc(sizeof(pthread_t) * capacity);
 
+    // Sem espaço
     if (queue->pcq_buffer == NULL) {
         printf("PCQ Malloc: Not enough space\n");
         exit(EXIT_FAILURE);
@@ -23,11 +25,10 @@ int pcq_create(pc_queue_t *queue, size_t capacity) {
     queue->pcq_capacity = capacity;
     queue->pcq_current_size = 0;
 
-    // Out of bounds -> mesmo que NULL (Não existem threads)
     queue->pcq_head = 0;
     queue->pcq_tail = 0;
 
-    // Mutexes init
+    // Inicializações de mutexes
     if (pthread_mutex_init(&queue->pcq_current_size_lock, NULL) != 0) {
         printf("[ERR]: Mutex init\n");
         return -1;
@@ -48,7 +49,8 @@ int pcq_create(pc_queue_t *queue, size_t capacity) {
         printf("[ERR]: Mutex init\n");
         return -1;
     }
-    // Condvars init
+
+    // Inicializações de variáveis de condição
     if (pthread_cond_init(&queue->pcq_pusher_condvar, NULL) != 0) {
         printf("[ERR]: Condvar init\n");
         return -1;
@@ -65,15 +67,17 @@ int pcq_create(pc_queue_t *queue, size_t capacity) {
 //
 // Memory: does not free the queue pointer itself
 int pcq_destroy(pc_queue_t *queue) {
-    for (int i = 0; i < queue->pcq_capacity; i++)
+    // Liberta a memória das threads
+    for (int i = 0; i < queue->pcq_capacity; i++){
         free(queue->pcq_buffer[i]);
-
+    }
     queue->pcq_capacity = 0;
     queue->pcq_current_size = 0;
 
     queue->pcq_head = 0;
     queue->pcq_tail = 0;
 
+    // Destruição dos mutexes
     if (pthread_mutex_destroy(&queue->pcq_current_size_lock) != 0) {
         printf("[ERR]: Mutex destroy\n");
         return -1;
@@ -94,7 +98,8 @@ int pcq_destroy(pc_queue_t *queue) {
         printf("[ERR]: Mutex destroy\n");
         return -1;
     }
-    // Condvars destroy
+
+    // Destruição das variáveis de condição
     if (pthread_cond_destroy(&queue->pcq_pusher_condvar) != 0) {
         printf("[ERR]: Condvar destroy\n");
         return -1;
@@ -116,13 +121,17 @@ int pcq_enqueue(pc_queue_t *queue, void *elem) {
     if (pthread_mutex_lock(&queue->pcq_pusher_condvar_lock) != 0)
         exit(EXIT_FAILURE);
 
+    // Threads todas ocupadas - espera que seja libertado espaço
     while (queue->pcq_current_size == queue->pcq_capacity) {
         pthread_cond_wait(&queue->pcq_pusher_condvar,
                           &queue->pcq_pusher_condvar_lock);
         should_unlock = 0;
     }
     pthread_mutex_lock(&queue->pcq_current_size_lock);
+
+
     if (queue->pcq_tail == 0) {
+        // Capacidade = 0
         if (queue->pcq_tail == queue->pcq_capacity) {
             queue->pcq_buffer[queue->pcq_tail] = NULL;
         }
@@ -135,6 +144,7 @@ int pcq_enqueue(pc_queue_t *queue, void *elem) {
         queue->pcq_tail++;
         queue->pcq_current_size++;
 
+        // Tail = Capacidade
         if (queue->pcq_tail == queue->pcq_capacity) {
             queue->pcq_buffer[queue->pcq_tail] = NULL;
         }
@@ -157,6 +167,7 @@ void *pcq_dequeue(pc_queue_t *queue) {
     if (pthread_mutex_lock(&queue->pcq_popper_condvar_lock) != 0)
         exit(EXIT_FAILURE);
 
+    // Caso não haja threads a correr, espera
     while (queue->pcq_current_size == 0) {
         pthread_cond_wait(&queue->pcq_popper_condvar,
                           &queue->pcq_popper_condvar_lock);

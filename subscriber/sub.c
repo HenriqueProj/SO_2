@@ -8,9 +8,13 @@
 
 int n_messages = 0;
 char *sub_name;
+
 int tx;
+
 // Dá print da mensagem após ser sinalizado o final da sessão
-static void handle() {
+static void close_sub() {
+    close(tx);
+    unlink(sub_name);
 
     fprintf(stdout, "Subscriber %s recebeu %d mensagens\n", sub_name,
             n_messages);
@@ -26,7 +30,7 @@ static void sig_handler(int sig) {
     if (signal(SIGINT, sig_handler) == SIG_ERR) {
         return;
     }
-    handle();
+    close_sub();
     return;
 }
 
@@ -99,5 +103,8 @@ int main(int argc, char **argv) {
     // Saiu do loop por erro
     fprintf(stderr, "[ERR]: READ FAILED: %s\n", strerror(errno));
     printf("%ld %d\n%s\n", bytes_read, code, message);
+
+    close_sub();
+
     return 0;
 }

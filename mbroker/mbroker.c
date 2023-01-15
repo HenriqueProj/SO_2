@@ -23,11 +23,59 @@ size_t n_boxes;
 pthread_t *tid;
 size_t max_sessions;
 
+pthread_t *tid;
+pthread_t main_thread;
+pc_queue_t *queue;
+
+char* register_pipe_name;
+// Liberta a memória antes de fechar o mbroker
+void mbroker_close(){
+    pcq_destroy(queue);
+    printf("%ld\n", n_boxes);
+    for(int i = 0; i < n_boxes; i++){
+        for(int j = 0; j < boxes[i].n_subscribers; i++){
+            printf("%s\n", boxes[i].subscribers[j]);
+            int tx = open_pipe(boxes[i].subscribers[j], 'w');
+            close(tx);
+        }
+    }
+
+    for(int i = 0; i < max_sessions; i++)
+        free(&tid[i]);
+    
+    free(queue);
+
+    //FIXME: Não é suposto??
+    pthread_kill(main_thread, SIGINT);
+
+    unlink(register_pipe_name);
+    printf("That's all folks!\n");
+}
+
+static void sig_handler(int sig) {
+
+
+    if (sig != SIGINT) 
+        return; 
+
+    // Catched SIGINT successfully
+    mbroker_close();
+    exit(EXIT_SUCCESS);
+}
+
 void delete_box(int i) {
     char string_aux[PIPE_NAME_SIZE];
     uint64_t int_aux;
     uint8_t last_aux;
 
+    if(boxes[i].n_publishers == 1){
+
+        char publisher_pipe[PIPE_NAME_SIZE];
+        strcpy(publisher_pipe, boxes[i].publisher);
+        printf("\n\n%s\n\n", publisher_pipe);
+        int tx = open_pipe(publisher_pipe, 'r');
+        close(tx);
+    }
     strcpy(string_aux, boxes[i].box_name);
     strcpy(boxes[i].box_name, boxes[n_boxes - 1].box_name);
     strcpy(boxes[n_boxes - 1].box_name, string_aux);
@@ -101,6 +149,7 @@ void recieve_messages_from_publisher(register_request_t publisher,
 
     if (ver == 0) {
         close(pub_pipe);
+        pcq_dequeue(queue);
         return;
     }
 
@@ -130,6 +179,8 @@ void recieve_messages_from_publisher(register_request_t publisher,
         boxes[box_index].n_publishers = 0;
         close(pub_pipe);
     }
+
+    pcq_dequeue(queue);
     tfs_close(box_handle);
 }
 
@@ -160,6 +211,7 @@ void *publisher_function(void *args) {
     }
 
     boxes[box_index].n_publishers = 1;
+    strcpy(boxes[box_index].publisher, arguments->client_name_pipe_path);
 
     recieve_messages_from_publisher(request, box_index, 1);
     return NULL;
@@ -177,6 +229,7 @@ void read_messages(register_request_t subscriber_request, int num) {
     if (num == 0)
         close(subscriber_pipe);
     if (box_handle == -1 || box_index == -1)
+        pcq_dequeue(queue);
         return;
     
 
@@ -222,6 +275,8 @@ void read_messages(register_request_t subscriber_request, int num) {
 
     tfs_close(box_handle);
     close(subscriber_pipe);
+
+    pcq_dequeue(queue);
 }
 
 void *register_subscriber(void *args) {
@@ -278,6 +333,8 @@ void reply_to_box_creation(char *pipe_name, int n) {
         exit(EXIT_FAILURE);
     }
     close(manager_pipe);
+
+    pcq_dequeue(queue);
 }
 
 void *create_box(void *args) {
@@ -348,6 +405,7 @@ void reply_to_box_removal(char *pipe_name, int n) {
         printf("Writing error\n");
         exit(EXIT_FAILURE);
     }
+    pcq_dequeue(queue);
 }
 
 void *remove_box(void *args) {
@@ -425,6 +483,7 @@ void reply_to_list_boxes(char *manager_pipe) {
         // Reseta o last para no segundo list não bloquear neste elemento
         boxes[n_boxes - 1].last = 0;
     }
+    pcq_dequeue(queue);
 }
 
 void *list_boxes(void *args) {
@@ -439,11 +498,6 @@ void *list_boxes(void *args) {
 }
 
 void *main_thread_function(void *arg) {
-    pc_queue_t *queue;
-
-    queue = (pc_queue_t *)malloc(sizeof(pc_queue_t));
-    pcq_create(queue, max_sessions);
-
     int *register_pipe = (int *)arg;
 
     uint8_t code;
@@ -473,7 +527,6 @@ void *main_thread_function(void *arg) {
                                    (void *)&args) != 0) {
                     exit(EXIT_FAILURE);
                 }
-                pcq_dequeue(queue);
             }
             break;
         case 2:
@@ -492,7 +545,6 @@ void *main_thread_function(void *arg) {
                                    (void *)&args) != 0) {
                     exit(EXIT_FAILURE);
                 }
-                pcq_dequeue(queue);
             }
             break;
         case 3:
@@ -512,7 +564,6 @@ void *main_thread_function(void *arg) {
                                    (void *)&args) != 0) {
                     exit(EXIT_FAILURE);
                 }
-                pcq_dequeue(queue);
             }
             break;
         case 5:
@@ -531,7 +582,6 @@ void *main_thread_function(void *arg) {
                                    (void *)&args) != 0) {
                     exit(EXIT_FAILURE);
                 }
-                pcq_dequeue(queue);
             }
             break;
         case 7:
@@ -547,7 +597,6 @@ void *main_thread_function(void *arg) {
                                    (void *)&pipe_name) != 0) {
                     exit(EXIT_FAILURE);
                 }
-                pcq_dequeue(queue);
             }
             break;
         default:
@@ -559,12 +608,17 @@ void *main_thread_function(void *arg) {
 }
 
 int main(int argc, char **argv) {
+    // Can't catch SIGINT
+    if (signal(SIGINT, sig_handler) == SIG_ERR)
+        exit(EXIT_FAILURE);
+    
+
     (void)argc;
 
     tfs_init(NULL);
     n_boxes = 0;
 
-    char *register_pipe_name = argv[1];
+    register_pipe_name = argv[1];
 
     long max_s = strtol(argv[2], NULL, 0);
 
@@ -572,7 +626,8 @@ int main(int argc, char **argv) {
 
     tid = malloc(sizeof(pthread_t) * max_sessions);
 
-    pthread_t main_thread;
+    queue = (pc_queue_t *)malloc(sizeof(pc_queue_t));
+    pcq_create(queue, max_sessions);
 
     // Cria register_pipe
     if (!create_pipe(register_pipe_name))
@@ -588,6 +643,8 @@ int main(int argc, char **argv) {
     }
 
     pthread_join(main_thread, NULL);
+
+    mbroker_close();
 
     printf("\nMbroker fechou\n\n");
     return 0;

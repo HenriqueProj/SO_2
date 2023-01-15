@@ -8,16 +8,18 @@
 #include <utils.h>
 
 int tx;
+char* pub_pipename;
 
 static void sig_handler(int sig) {
 
     if (sig == SIGPIPE) {
 
         //
-        if (signal(SIGPIPE, sig_handler) == SIG_ERR) {
+        if (signal(SIGPIPE, sig_handler) == SIG_ERR)
             exit(EXIT_FAILURE);
-        }
+        printf("SIGPIPE!\n");
         close(tx);
+        unlink(pub_pipename);
     }
 
     exit(EXIT_SUCCESS);
@@ -32,7 +34,7 @@ int main(int argc, char **argv) {
         return -1;
 
     char *register_pipe = argv[1];
-    char *pub_pipename = argv[2];
+    pub_pipename = argv[2];
     char *box_name = argv[3];
 
     // abre o register pipe para mandar o pedido de registo
@@ -100,5 +102,6 @@ int main(int argc, char **argv) {
     }
 
     close(tx);
+    unlink(pub_pipename);
     return -1;
 }
